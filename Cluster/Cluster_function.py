@@ -5,6 +5,7 @@ from tqdm import tqdm_notebook as tqdm
 from sklearn.preprocessing import MinMaxScaler
 import pywt
 import copy
+import matplotlib.pyplot as plt
 
 
 import pylab as pl
@@ -81,11 +82,15 @@ def Close_denoise(data, feature='close', levels=6, scale=True):
     '''
     
     d = data.copy().sort_values(by='ts').reset_index(drop=True)
-    sc = MinMaxScaler(feature_range = (0, 1))
-    a = sc.fit_transform(np.array(d[feature]).reshape(len(d), 1))
-    d['close_normalized'] = a
+    if scale:
+        sc = MinMaxScaler(feature_range = (0, 1))
+        a = sc.fit_transform(np.array(d[feature]).reshape(len(d), 1))
+        d['close_normalized'] = a
     
-    d['denoised'] =  WT(d['close_normalized'], lv=levels, n=levels)
+        d['denoised'] =  WT(d['close_normalized'], lv=levels, n=levels)
+
+    else:
+        d['denoised'] =  WT(d['close'], lv=levels, n=levels)
 
     return d
 
@@ -120,12 +125,34 @@ def Cluster_df(data, End, Start=date(2004,2,11), feature='denoised'):
 
 
 
-def Correlation(stock, data, all_stocks):
+
+class CorrClass():
+    def __init__(self):
+        self.corr_dict = {}
+        print("i am someone u did not know.")
+    
+    def correlation(pars):
+        s1 = max(stock, stock_other)
+        s2 = min(stock, stock_other)        
+        if (s1, s2) in self.corr_dict:
+             x = self.corr_dict[(s1, s2)]
+        else:
+            pass
+
+
+cc = CorrClass()
+cc.correlation()
+    
+
+
+def Correlation(stock, data, all_stocks, corr_dict):
 
     '''
     Return the correlation list of a given stock with all other stocks in dataframe.
     '''
-
+    
+    for stock_other in all_stocks:
+        df = data[[stock, stock_other]].dropna()
     corr_list = [data[[stock, stock_other]].dropna().iloc[:, 0].corr(data[[stock, stock_other]].dropna().iloc[:, 1]) for stock_other in all_stocks]
     
     corr = pd.Series(corr_list).rename(stock)
@@ -269,8 +296,7 @@ def FindCluster(stock_name, all_df, cluster_df, cluster_num=9):
 
 
     for stock_list in cluster_list:
-        array = all_df[stock_name]
-        corr_mean = np.array([array.corr(all_df[stock]) for stock in stock_df]).mean()
+        corr_mean = np.array([all_df[[stock_name, stock]].dropna().iloc[:, 0].corr(all_df[[stock_name, stock]].dropna().iloc[:, 1]) for stock in stock_list]).mean()
         corr_list.append(corr_mean)
 
     cluster_num = corr_list.index(max(corr_list))
@@ -278,15 +304,4 @@ def FindCluster(stock_name, all_df, cluster_df, cluster_num=9):
     return [stock_name, cluster_num]
 
 
-def ClusterSplit(clusterdata, data, cluster_num, filepath):
 
-    '''
-    Split data into different clusters.
-    Input the dataframe containing labels(clusterdata), dataframe containing all stocks, total cluster and writing path
-    '''
-
-    for i in tqdm(range(cluster_num)):
-        stock_list = clusterdata[clusterdata['cluster'] == i].index.tolist()
-        df = data[data['StockName'].isin(stock_list)]
-
-        df.to_csv(filepath + 'Cluster_{}.csv'.format(i), index=False)

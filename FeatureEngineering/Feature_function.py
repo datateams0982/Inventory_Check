@@ -1,8 +1,7 @@
 import numpy as np 
 import pandas as pd 
 import datetime
-from datetime import datetime
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from sklearn.preprocessing import OneHotEncoder
 from tqdm import tqdm_notebook as tqdm
 import calendar
@@ -117,8 +116,25 @@ def WT(index_list, wavefunc='db4', lv=4, m=1, n=4, plot=False):
 
 
 ##Compute Technical Indicators    
-def get_technical_indicators(data):
-    dataset = data.copy().reset_index(drop=True)
+def get_technical_indicators(data, SplitDate=date(2017,9,1), denoise=True):
+    data = data.reset_index(drop=True).sort_values(by='ts')
+
+    if denoise:
+        d1 = data[data['ts'] < SplitDate].reset_index(drop=True)
+        d2 = data[data['ts'] >= SplitDate].reset_index(drop=True)
+        if len(d1) > 0:
+            d1['origin_close'] = d1['close']
+            d1['open'], d1['high'], d1['low'], d1['close'], d1['vol'] = WT(d1['open'], lv=6, n=6), WT(d1['high'], lv=6, n=6), WT(d1['low'], lv=6, n=6), WT(d1['close'], lv=6, n=6), WT(d1['vol'], lv=6, n=6)
+            d2['origin_close'] = d2['close']
+            d2['open'], d2['high'], d2['low'], d2['close'], d2['vol'] = WT(d2['open'], lv=6, n=6), WT(d2['high'], lv=6, n=6), WT(d2['low'], lv=6, n=6), WT(d2['close'], lv=6, n=6), WT(d2['vol'], lv=6, n=6)
+
+            dataset = pd.concat([d1, d2], axis=0).reset_index(drop=True).sort_values(by='ts')
+
+        else:
+            d2['origin_close'] = d2['close']
+            d2['open'], d2['high'], d2['low'], d2['close'], d2['vol'] = WT(d2['open'], lv=6, n=6), WT(d2['high'], lv=6, n=6), WT(d2['low'], lv=6, n=6), WT(d2['close'], lv=6, n=6), WT(d2['vol'], lv=6, n=6)
+            dataset = d2
+       
     
     dataset['close_lag'] = dataset['close'].shift(1)
     # Create 7 and 21 days Moving Average
@@ -287,9 +303,14 @@ def label(row):
         return 'flat'
 
 
-def get_label(data):
+def get_label(data, denoise=True):
 
-    data['WeeklyReturn'] = data['close'] - data['close'].shift(5)
+    data = data.reset_index(drop=True)
+    if denoise:
+        data['WeeklyReturn'] = data['origin_close'] - data['origin_close'].shift(5)
+    else: 
+        data['WeeklyReturn'] = data['close'] - data['close'].shift(5)
+
     df = data[data['26ema'].notnull()]
 
     if len(df) == 0:
@@ -302,3 +323,17 @@ def get_label(data):
         df['label'] = df.apply(label, axis=1)
     
         return df
+
+
+def ClusterSplit(clusterdata, data, cluster_num, filepath):
+
+    '''
+    Split data into different clusters.
+    Input the dataframe containing labels(clusterdata), dataframe containing all stocks, total cluster and writing path
+    '''
+
+    for i in tqdm(range(cluster_num)):
+        stock_list = clusterdata[clusterdata['cluster'] == i].index.tolist()
+        df = data[data['StockName'].isin(stock_list)]
+
+        df.to_csv(filepath + 'Cluster_{}.csv'.format(i), index=False)

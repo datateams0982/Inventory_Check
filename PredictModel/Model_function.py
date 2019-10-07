@@ -11,9 +11,8 @@ from tensorflow.compat.v1.keras.layers import CuDNNLSTM
 from tensorflow.keras import layers, optimizers
 from tensorflow.keras.callbacks import EarlyStopping
 
-from sklearn.preprocessing import StandardScaler
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.preprocessing import Normalizer
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OneHotEncoder
 
 
 def get_dependent_variable(Y_train, Y_val, Y_test):
@@ -22,6 +21,16 @@ def get_dependent_variable(Y_train, Y_val, Y_test):
         testing = [item[2] for item in Y_test]
 
         return training, val, testing
+
+
+def categorical_transform(data):
+
+    onehot_encoder = OneHotEncoder(sparse=False)
+
+    d = np.array(data).reshape(len(data), 1)
+    Y = onehot_encoder.fit_transform(d)
+
+    return Y
 
 
 def transform_back(array, cluster, scaler='standardize'):
