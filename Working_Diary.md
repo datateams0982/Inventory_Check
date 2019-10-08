@@ -12,3 +12,4 @@
 * Tried XGboost, find that previous 5 days are the most important.
 * Performance heterogeneity between different stocks in the same cluster(3X~7X)
 * Average performance(accuracy) : 60%~65%
+* Suggestions: Check the momentum of the cluster, check intra-cluster detail, expecially those clusters with small size.
