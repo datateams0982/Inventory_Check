@@ -18,4 +18,4 @@
 
 * Check cluster momentum: Can't last for long time
 * New cluster method: Base on volume volatility, volume size, price volatility (time weighted mean)
-* 
+* Two-stage Cluster: Kmedians, apply cluster algo again on those with large size
