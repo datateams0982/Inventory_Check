@@ -13,3 +13,9 @@
 * Performance heterogeneity between different stocks in the same cluster(3X~7X)
 * Average performance(accuracy) : 60%~65%
 * Suggestions: Check the momentum of the cluster, check intra-cluster detail, expecially those clusters with small size.
+
+# 2019/10/09
+
+* Check cluster momentum: Can't last for long time
+* New cluster method: Base on volume volatility, volume size, price volatility (time weighted mean)
+* 
