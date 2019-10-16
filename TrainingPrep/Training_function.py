@@ -9,13 +9,18 @@ import os
 import datetime
 from datetime import datetime, timedelta
 
-def TrainTestSplit(data, TrainDate, ValDate):
+def TrainTestSplit(data, TrainDate):
 
+<<<<<<< Updated upstream
     train_df = data[data['ts'].dt.date < TrainDate]
     val_df = data[data['ts'].dt.date < ValDate][data['ts'].dt.date >= TrainDate]
     test_df = data[data['ts'].dt.date >= ValDate]
+=======
+    train_df = data[data['ts'].dt.date < TrainDate][data['26ema'].notnull()]
+    test_df = data[data['ts'].dt.date >= TrainDate][data['26ema'].notnull()]
+>>>>>>> Stashed changes
 
-    return train_df, val_df, test_df
+    return train_df, test_df
 
 
 def GetScalerParam(train_df, feature_list):

@@ -114,16 +114,20 @@ def FillMissingTime(data, timedf):
         return [status, data]
 
     else:
-        Start_date = data['On_Date'].iloc[0]
-        End_date = data['Off_Date'].iloc[-1]
+        End_date = data['ts'].iloc[-1]
         
         if End_date < datetime.strptime('2019-09-23', '%Y-%m-%d').date():
             status = False
             return [status]
         
-
-        time_df = timedf[timedf.ts.dt.date >= Start_date]
-        time_df = time_df[time_df.ts.dt.date <= End_date]
+        if len(data[data.OnDate.notnull()]) == 0:
+            time_df = timedf[timedf.ts.dt.date <= End_date]
+        
+        else:
+            Start_date = data['OnDate'].iloc[0]
+            time_df = timedf[timedf.ts.dt.date >= Start_date]
+            time_df = time_df[time_df.ts.dt.date <= End_date]
+        
         d = pd.merge(time_df, data, on="ts", how="left")
 
         d = d.sort_values(by="ts")

@@ -4,6 +4,7 @@ import datetime
 from datetime import datetime, timedelta, date
 from sklearn.preprocessing import OneHotEncoder
 from tqdm import tqdm_notebook as tqdm
+from scipy.stats import skew, kurtosis
 import calendar
 import math
 import pywt 
@@ -11,7 +12,7 @@ import copy
 
 #Compute True Range
 def TR(row):
-    TR = max([(row["high"] - row["low"]), (row["high"] - row["close_lag"]), (row["close_lag"] - row["low"])])
+    TR = max([(row["high"] - row["low"]), abs(row["high"] - row["close_lag"]), abs(row["close_lag"] - row["low"])])
     
     return TR
 
@@ -62,6 +63,15 @@ def VWAP(row):
     else:
         vwap = row['total']/row['vol']
         return vwap
+
+
+def price_volume_trend(row):
+
+    pvt = row['vol'] * (row['close'] - row['close_lag']) / row['close_lag']
+        
+    return pvt
+
+
 
 #Denoise
 def WT(index_list, wavefunc='db4', lv=4, m=1, n=4, plot=False):
@@ -115,17 +125,32 @@ def WT(index_list, wavefunc='db4', lv=4, m=1, n=4, plot=False):
     return denoised_index
 
 
+def remove_outlier(row, alpha):
+    if (abs(row['close'] - row['close_lag']) > alpha * row['close_lag']) and (abs(row['close']- row['close_next']) > alpha * (1 + alpha/2) * row['close_next']):
+        return 1
+    elif (abs(row['close'] - row['close_next']) > alpha * row['close_next']) and (abs(row['close']- row['close_lag']) > alpha * (1 + alpha/2) * row['close_lag']):
+        return 1
+    else:
+        return 0
+
+
+
 ##Compute Technical Indicators    
 def get_technical_indicators(data, SplitDate=date(2017,9,1), denoise=True):
     data = data.reset_index(drop=True).sort_values(by='ts')
+
+    data['VWAP'] = data.apply(VWAP, axis=1)
+
 
     if denoise:
         d1 = data[data['ts'] < SplitDate].reset_index(drop=True)
         d2 = data[data['ts'] >= SplitDate].reset_index(drop=True)
         if len(d1) > 0:
             d1['origin_close'] = d1['close']
-            d1['open'], d1['high'], d1['low'], d1['close'], d1['vol'] = WT(d1['open'], lv=6, n=6), WT(d1['high'], lv=6, n=6), WT(d1['low'], lv=6, n=6), WT(d1['close'], lv=6, n=6), WT(d1['vol'], lv=6, n=6)
+            d1['open'], d1['high'], d1['low'], d1['close'] = WT(d1['open'], lv=6, n=6), WT(d1['high'], lv=6, n=6), WT(d1['low'], lv=6, n=6), WT(d1['close'], lv=6, n=6)
+            d1.loc[d1[d1['vol'] != 0].index.tolist(), 'vol'], d1.loc[d1[d1['vol'] != 0].index.tolist(), 'VWAP'] = WT(d1.loc[d1[d1['vol'] != 0].index.tolist(), 'vol'], lv=6, n=6), WT(d1.loc[d1[d1['vol'] != 0].index.tolist(), 'VWAP'], lv=6, n=6)
             d2['origin_close'] = d2['close']
+<<<<<<< Updated upstream
             d2['open'], d2['high'], d2['low'], d2['close'], d2['vol'] = WT(d2['open'], lv=6, n=6), WT(d2['high'], lv=6, n=6), WT(d2['low'], lv=6, n=6), WT(d2['close'], lv=6, n=6), WT(d2['vol'], lv=6, n=6)
 
             dataset = pd.concat([d1, d2], axis=0).reset_index(drop=True).sort_values(by='ts')
@@ -133,6 +158,16 @@ def get_technical_indicators(data, SplitDate=date(2017,9,1), denoise=True):
         else:
             d2['origin_close'] = d2['close']
             d2['open'], d2['high'], d2['low'], d2['close'], d2['vol'] = WT(d2['open'], lv=6, n=6), WT(d2['high'], lv=6, n=6), WT(d2['low'], lv=6, n=6), WT(d2['close'], lv=6, n=6), WT(d2['vol'], lv=6, n=6)
+=======
+            d2['open'], d2['high'], d2['low'], d2['close'] = WT(d2['open'], lv=3, n=3), WT(d2['high'], lv=3, n=3), WT(d2['low'], lv=3, n=3), WT(d2['close'], lv=3, n=3)
+            d2.loc[d2[d2['vol'] != 0].index.tolist(), 'vol'], d2.loc[d2[d2['vol'] != 0].index.tolist(), 'VWAP'] = WT(d2.loc[d2[d2['vol'] != 0].index.tolist(), 'vol'], lv=3, n=3), WT(d2.loc[d2[d2['vol'] != 0].index.tolist(), 'VWAP'], lv=3, n=3)
+            dataset = pd.concat([d1, d2], axis=0).reset_index(drop=True).sort_values(by='ts')
+
+        else:
+            d2['origin_close'], d2['origin_vol'] = d2['close'], d2['vol']
+            d2['open'], d2['high'], d2['low'], d2['close'], d2['vol'], d2['VWAP'] = WT(d2['open'], lv=3, n=3), WT(d2['high'], lv=3, n=3), WT(d2['low'], lv=3, n=3), WT(d2['close'], lv=3, n=3), WT(d2['vol'], lv=3, n=3), WT(d2['VWAP'], lv=3, n=3)
+            d2.loc[d2[d2['vol'] != 0].index.tolist(), 'vol'], d2.loc[d2[d2['vol'] != 0].index.tolist(), 'VWAP'] = WT(d2.loc[d2[d2['vol'] != 0].index.tolist(), 'vol'], lv=3, n=3), WT(d2.loc[d2[d2['vol'] != 0].index.tolist(), 'VWAP'], lv=3, n=3)
+>>>>>>> Stashed changes
             dataset = d2
        
     
@@ -149,10 +184,22 @@ def get_technical_indicators(data, SplitDate=date(2017,9,1), denoise=True):
     dataset['20sd'] = dataset['close'].rolling(window=20).std()
     dataset['upper_band'] = dataset['ma21'] + (dataset['20sd']*2)
     dataset['lower_band'] = dataset['ma21'] - (dataset['20sd']*2)
+
+    #Compute skewness and kurtosis
+    dataset['skew'] = dataset['close'].rolling(window=20).apply(lambda x: skew(x))
+    dataset['kurtosis'] = dataset['close'].rolling(window=20).apply(lambda x: kurtosis(x))
+
+    #Compute PVT
+    dataset['pvt_current'] = dataset.apply(price_volume_trend, axis=1)
+    dataset['pvt'] = dataset['pvt_current'] + dataset['pvt_current'].shift(1)
     
     # Create True Range
     dataset['TR'] = dataset.apply(TR, axis=1)
     dataset['ATR'] = dataset['TR'].ewm(span=15).mean()
+    dataset.loc[dataset[dataset['open'] < 0].index.tolist(), 'open'] = 0
+    dataset.loc[dataset[dataset['close'] < 0].index.tolist(), 'close'] = 0
+    dataset.loc[dataset[dataset['high'] < 0].index.tolist(), 'high'] = 0
+    dataset.loc[dataset[dataset['low'] < 0].index.tolist(), 'low'] = 0
     
     # Create Reletive Strength Index
     dataset = RSI(dataset, n=15)
@@ -160,10 +207,9 @@ def get_technical_indicators(data, SplitDate=date(2017,9,1), denoise=True):
     # Create Stochastic Oscillator
     dataset = STO(dataset, nk=5, nD=3)
 
-    # Create VWAP
-    dataset['VWAP'] = dataset.apply(VWAP, axis=1)
     
-    dataset = dataset.drop(columns=['close_lag', '20sd'])
+    
+    dataset = dataset.drop(columns=['close_lag', 'open_lag', 'low_lag', 'high_lag', 'total_lag', 'close_next', 'open_next', 'low_next', 'high_next', 'total_next', 'outlier', '20sd'])
 
     return dataset
 
