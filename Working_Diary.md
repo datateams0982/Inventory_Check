@@ -25,4 +25,11 @@
 * Cluster Method: Base on volume size, price volatility (Remove outliers)
 * CNN on cluster 2 and 4
 * check performance on middle point and others
-* 
+
+# 2019/10/16
+
+* Cluster Method: Base on total size, price volatility, capital (log transformation and standardization)
+* largest 60% and others separated
+* Update 2008/06/19 data
+* Preprocess fundamental and capital reduction data
+* Add reduction period indicator to raw data
