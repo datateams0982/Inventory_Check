@@ -33,3 +33,15 @@
 * Update 2008/06/19 data
 * Preprocess fundamental and capital reduction data
 * Add reduction period indicator to raw data
+
+# 2019/10/17
+
+* Feature Engineering Complete: Kurtosis, skew, price volume trend
+* Model experiment: CNN, CNN_randomforest, CNN_XGboost
+* Building classes for fine tuning
+
+
+
+
+
+
