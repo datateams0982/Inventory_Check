@@ -150,15 +150,6 @@ def get_technical_indicators(data, SplitDate=date(2017,9,1), denoise=True):
             d1['open'], d1['high'], d1['low'], d1['close'] = WT(d1['open'], lv=6, n=6), WT(d1['high'], lv=6, n=6), WT(d1['low'], lv=6, n=6), WT(d1['close'], lv=6, n=6)
             d1.loc[d1[d1['vol'] != 0].index.tolist(), 'vol'], d1.loc[d1[d1['vol'] != 0].index.tolist(), 'VWAP'] = WT(d1.loc[d1[d1['vol'] != 0].index.tolist(), 'vol'], lv=6, n=6), WT(d1.loc[d1[d1['vol'] != 0].index.tolist(), 'VWAP'], lv=6, n=6)
             d2['origin_close'] = d2['close']
-<<<<<<< Updated upstream
-            d2['open'], d2['high'], d2['low'], d2['close'], d2['vol'] = WT(d2['open'], lv=6, n=6), WT(d2['high'], lv=6, n=6), WT(d2['low'], lv=6, n=6), WT(d2['close'], lv=6, n=6), WT(d2['vol'], lv=6, n=6)
-
-            dataset = pd.concat([d1, d2], axis=0).reset_index(drop=True).sort_values(by='ts')
-
-        else:
-            d2['origin_close'] = d2['close']
-            d2['open'], d2['high'], d2['low'], d2['close'], d2['vol'] = WT(d2['open'], lv=6, n=6), WT(d2['high'], lv=6, n=6), WT(d2['low'], lv=6, n=6), WT(d2['close'], lv=6, n=6), WT(d2['vol'], lv=6, n=6)
-=======
             d2['open'], d2['high'], d2['low'], d2['close'] = WT(d2['open'], lv=3, n=3), WT(d2['high'], lv=3, n=3), WT(d2['low'], lv=3, n=3), WT(d2['close'], lv=3, n=3)
             d2.loc[d2[d2['vol'] != 0].index.tolist(), 'vol'], d2.loc[d2[d2['vol'] != 0].index.tolist(), 'VWAP'] = WT(d2.loc[d2[d2['vol'] != 0].index.tolist(), 'vol'], lv=3, n=3), WT(d2.loc[d2[d2['vol'] != 0].index.tolist(), 'VWAP'], lv=3, n=3)
             dataset = pd.concat([d1, d2], axis=0).reset_index(drop=True).sort_values(by='ts')
@@ -167,7 +158,6 @@ def get_technical_indicators(data, SplitDate=date(2017,9,1), denoise=True):
             d2['origin_close'], d2['origin_vol'] = d2['close'], d2['vol']
             d2['open'], d2['high'], d2['low'], d2['close'], d2['vol'], d2['VWAP'] = WT(d2['open'], lv=3, n=3), WT(d2['high'], lv=3, n=3), WT(d2['low'], lv=3, n=3), WT(d2['close'], lv=3, n=3), WT(d2['vol'], lv=3, n=3), WT(d2['VWAP'], lv=3, n=3)
             d2.loc[d2[d2['vol'] != 0].index.tolist(), 'vol'], d2.loc[d2[d2['vol'] != 0].index.tolist(), 'VWAP'] = WT(d2.loc[d2[d2['vol'] != 0].index.tolist(), 'vol'], lv=3, n=3), WT(d2.loc[d2[d2['vol'] != 0].index.tolist(), 'VWAP'], lv=3, n=3)
->>>>>>> Stashed changes
             dataset = d2
        
     
