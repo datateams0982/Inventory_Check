@@ -13,6 +13,18 @@ from tensorflow.keras.callbacks import EarlyStopping
 
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.metrics import classification_report
+
+def validation_split(X_train, Y_train, step=20):
+    length = len(X_train)//step
+    val_index = [(step * i) - 1 for i in range(1, length + 1, 1)]
+    train_index = [i for i in range(len(X_train)) if i%step != step-1]
+    valX = [X_train[i] for i in val_index]
+    trainX = [X_train[i] for i in train_index]
+    valY = [Y_train[i] for i in val_index]
+    trainY = [Y_train[i] for i in train_index]
+    
+    return trainX, trainY, valX, valY   
 
 
 def get_dependent_variable(Y_train, Y_val, Y_test):
@@ -33,108 +45,51 @@ def categorical_transform(data):
     return Y
 
 
-def transform_back(array, cluster, scaler='standardize'):
-        filename = 'D:\\庫存健診開發\\data\\Training\\Raw\\Cluster_{}.csv'.format(cluster)
 
-        d = pd.read_csv(filename)
-
-        if scaler.lower() == 'standardize':
-                sc = StandardScaler()
-
-        elif scaler.lower() == 'minmax_zero':
-                sc = MinMaxScaler(feature_range = (0, 1))
-
-        elif scaler.lower() == 'minmax_one':
-                sc = MinMaxScaler(feature_range = (-1, 1))
-
-        elif scaler.lower() == 'normalize':
-                sc = Normalizer(norm='l2')
-
-        sc.fit(np.array(d['close']).reshape(len(d), 1))
-        transformed = sc.inverse_transform(array)
-
-        return transformed
-
-
-def labelATR(row):
-    if row['return_pred'] > row['ATR']:
-        return 'up'
-    elif row['return_pred'] < (-1) * row['ATR']:
-        return 'down'
-    else:
-        return 'flat'
-
-def label(row):
-    if row['return_pred'] > 0:
-        return 'up'
-    elif row['return_pred'] < 0:
-        return 'down'
-    else:
-        return 'flat'
-
-
-
-
-def get_prediction_label(prediction, test, cluster, problem='Weekly_ATR'):
-        filename = 'D:\\庫存健診開發\\data\\Training\\Raw\\Cluster_{}.csv'.format(cluster)
-
-        data = pd.read_csv(filename, converters={'ts':str, 'StockNo': str})
-        data['ts'] = pd.to_datetime(data['ts'])
-
-        pred_list = prediction.tolist()
-        for i, item in enumerate(test):
-                pred_list[i].extend(test[i][:2])
-
-        pred_df = pd.DataFrame(np.array(pred_list), columns=['prediction', 'ts', 'StockNo'])
-        d = pd.merge(data, pred_df, on=['ts', 'StockNo'], how='left')
-
-        df_list = [group[1] for group in d.groupby(d['StockNo'])]
-
-        for df in df_list:
-                if problem == 'Weekly_ATR':
-                        df['return_pred'] = df['prediction'] - df['close'].shift(5)
-                        df['label_pred'] = df.apply(labelATR, axis=1)
-
-                elif problem == 'Weekly':
-                        df['return_pred'] = df['prediction'] - df['close'].shift(5)
-                        df['label_pred'] = df.apply(label, axis=1)
-
-                elif problem == 'Daily_ATR':
-                        df['return_pred'] = df['prediction'] - df['close'].shift(1)
-                        df['label_pred'] = df.apply(labelATR, axis=1)
+def Separate_Evaluation(Feature, Real, prediction, model, **kwargs):
+        
+        r = prediction.tolist()
+        y_pred = []
+        for i, item in enumerate(r):
+                y_pred.append(item.index(max(item))) 
                 
-                elif problem == 'Daily':
-                        df['return_pred'] = df['prediction'] - df['close'].shift(1)
-                        df['label_pred'] = df.apply(label, axis=1)
-
+        
+        if len(kwargs.keys()) == 1:
+                if 'year' in kwargs:
+                        value = kwargs['year']
+                        y_true = [sublist[2] for sublist in Real if sublist[0].year == value]  
+                        y_index = [i for i, sublist in enumerate(Real) if sublist[0].year == value]
                 else:
-                        return 'Problem not exist'
-
-        
-        d = pd.concat(df_list, axis=0)
-        df_new = d[d['prediction'].notnull()].reset_index(drop=True)
-
-        return df_new
-
-
-def Regression_Evaluation(data, problem='Weekly_ATR'):
-        
-        if problem == 'Weekly_ATR':
-                accuracy = len(data[data['label_weekly_ATR'] == data['label_pred']]) / len(data)
-
-        elif problem == 'Weekly':
-                accuracy = len(data[data['label_weekly'] == data['label_pred']]) / len(data)
-
-        elif problem == 'Daily_ATR':
-                accuracy = len(data[data['label_ATR'] == data['label_pred']]) / len(data)
-                
-        elif problem == 'Daily':
-                accuracy = len(data[data['label'] == data['label_pred']]) / len(data)
+                        value = kwargs['stock']
+                        y_true = [sublist[2] for sublist in Real if sublist[1] == value]  
+                        y_index = [i for i, sublist in enumerate(Real) if sublist[1] == value]
 
         else:
-                return 'Problem not exist'
+                year = kwargs['year']
+                stock = kwargs['stock']
+                y_true = [sublist[2] for sublist in Real if (sublist[0].year == year) and (sublist[1] == stock)]  
+                y_index = [i for i, sublist in enumerate(Real) if (sublist[0].year == year) and (sublist[1] == stock)]
 
-        return accuracy
+        
+        y_true_encode = categorical_transform(y_true)
+        y = [y_pred[i] for i in y_index]
+        X = [Feature[i] for i in y_index]
+        
+        correct = 0
+        for i, item in enumerate(y):
+            if item == y_true[i]:
+                correct += 1
+            else:
+                continue
+                
+        target_names = ['down', 'up']
+        auc = model.evaluate(np.array(X), y_true_encode)[1]
+        
+        report = classification_report(y_true, y, target_names=target_names)
+        accuracy = correct/len(y)
+        
+
+        return report, accuracy, auc
 
 
 

@@ -125,13 +125,77 @@ def WT(index_list, wavefunc='db4', lv=4, m=1, n=4, plot=False):
     return denoised_index
 
 
-def remove_outlier(row, alpha):
-    if (abs(row['close'] - row['close_lag']) > alpha * row['close_lag']) and (abs(row['close']- row['close_next']) > alpha * (1 + alpha/2) * row['close_next']):
-        return 1
-    elif (abs(row['close'] - row['close_next']) > alpha * row['close_next']) and (abs(row['close']- row['close_lag']) > alpha * (1 + alpha/2) * row['close_lag']):
-        return 1
-    else:
-        return 0
+def eliminate_recognition(row):
+    eliminate = row['eliminate_period']
+    if (row['eliminate_start'] == 1) and (row['eliminate_period'] == 0):
+        eliminate = 2
+    elif (row['eliminate_end'] == 1) and (row['eliminate_period'] == 0):
+        eliminate = 3
+    
+    return eliminate
+
+
+def denoise_feature(data):
+    d = data.sort_values(by='ts').reset_index(drop=True)
+    d['origin_close'] = d['close']
+    d['eliminate_start'] = d['eliminate_period'].shift(-1)
+    d['eliminate_end'] = d['eliminate_period'].shift(1)
+    d['eliminate'] = d.apply(eliminate_recognition, axis=1)
+    d = d.drop(columns=['eliminate_start', 'eliminate_end', 'eliminate_period'])
+    d = d.sort_values(by='ts').reset_index(drop=True)
+
+    denoise_level = [[600, 3], [1200, 4], [1800, 5], [4000, 6]]
+
+    if len(d[d['eliminate'] == 1]) == 0:
+        for item in denoise_level:
+            if len(d) <= item[0]:
+                level = item[1]
+                d['open'], d['high'], d['low'], d['close'] = WT(d['open'], lv=level, n=level), WT(d['high'], lv=level, n=level), WT(d['low'], lv=level, n=level), WT(d['close'], lv=level, n=level)
+                d.loc[d[d['vol'] != 0].index.tolist(), 'vol'], d.loc[d[d['vol'] != 0].index.tolist(), 'VWAP'] = WT(d.loc[d[d['vol'] != 0].index.tolist(), 'vol'], lv=level, n=level), WT(d.loc[d[d['vol'] != 0].index.tolist(), 'VWAP'], lv=level, n=level)
+                break
+            else:
+                continue
+
+        return d
+
+    d = d[d['eliminate'] != 1]
+    start_date = d[d['eliminate'] == 2]['ts'].tolist()
+    start_date.sort(reverse=True)
+    df_list = []
+    for start in start_date:
+        d1 = d[d['ts'] <= start]
+        for item in denoise_level:
+            if len(d1) == 0:
+                break
+            elif len(d1) <= item[0]:
+                level = item[1]
+                d1['open'], d1['high'], d1['low'], d1['close'] = WT(d1['open'], lv=level, n=level), WT(d1['high'], lv=level, n=level), WT(d1['low'], lv=level, n=level), WT(d1['close'], lv=level, n=level)
+                d1.loc[d1[d1['vol'] != 0].index.tolist(), 'vol'], d1.loc[d1[d1['vol'] != 0].index.tolist(), 'VWAP'] = WT(d1.loc[d1[d1['vol'] != 0].index.tolist(), 'vol'], lv=level, n=level), WT(d1.loc[d1[d1['vol'] != 0].index.tolist(), 'VWAP'], lv=level, n=level)
+                break
+            else:
+                continue
+
+        df_list.append(d1)
+        d = d[d['ts'] > start]
+
+        
+    for item in denoise_level:
+        if len(d) == 0:
+            break
+        elif len(d) <= item[0]:
+            level = item[1]
+            d['open'], d['high'], d['low'], d['close'] = WT(d['open'], lv=level, n=level), WT(d['high'], lv=level, n=level), WT(d['low'], lv=level, n=level), WT(d['close'], lv=level, n=level)
+            d.loc[d[d['vol'] != 0].index.tolist(), 'vol'], d.loc[d[d['vol'] != 0].index.tolist(), 'VWAP'] = WT(d.loc[d[d['vol'] != 0].index.tolist(), 'vol'], lv=level, n=level), WT(d.loc[d[d['vol'] != 0].index.tolist(), 'VWAP'], lv=level, n=level)
+            break
+        else:
+            continue
+
+    df_list.append(d)
+
+    df = pd.concat(df_list, axis=0)
+
+    return df
+
 
 
 
@@ -146,19 +210,12 @@ def get_technical_indicators(data, SplitDate=date(2017,9,1), denoise=True):
         d1 = data[data['ts'] < SplitDate].reset_index(drop=True)
         d2 = data[data['ts'] >= SplitDate].reset_index(drop=True)
         if len(d1) > 0:
-            d1['origin_close'] = d1['close']
-            d1['open'], d1['high'], d1['low'], d1['close'] = WT(d1['open'], lv=6, n=6), WT(d1['high'], lv=6, n=6), WT(d1['low'], lv=6, n=6), WT(d1['close'], lv=6, n=6)
-            d1.loc[d1[d1['vol'] != 0].index.tolist(), 'vol'], d1.loc[d1[d1['vol'] != 0].index.tolist(), 'VWAP'] = WT(d1.loc[d1[d1['vol'] != 0].index.tolist(), 'vol'], lv=6, n=6), WT(d1.loc[d1[d1['vol'] != 0].index.tolist(), 'VWAP'], lv=6, n=6)
-            d2['origin_close'] = d2['close']
-            d2['open'], d2['high'], d2['low'], d2['close'] = WT(d2['open'], lv=3, n=3), WT(d2['high'], lv=3, n=3), WT(d2['low'], lv=3, n=3), WT(d2['close'], lv=3, n=3)
-            d2.loc[d2[d2['vol'] != 0].index.tolist(), 'vol'], d2.loc[d2[d2['vol'] != 0].index.tolist(), 'VWAP'] = WT(d2.loc[d2[d2['vol'] != 0].index.tolist(), 'vol'], lv=3, n=3), WT(d2.loc[d2[d2['vol'] != 0].index.tolist(), 'VWAP'], lv=3, n=3)
+            d1 = denoise_feature(d1)
+            d2 = denoise_feature(d2)
             dataset = pd.concat([d1, d2], axis=0).reset_index(drop=True).sort_values(by='ts')
 
         else:
-            d2['origin_close'], d2['origin_vol'] = d2['close'], d2['vol']
-            d2['open'], d2['high'], d2['low'], d2['close'], d2['vol'], d2['VWAP'] = WT(d2['open'], lv=3, n=3), WT(d2['high'], lv=3, n=3), WT(d2['low'], lv=3, n=3), WT(d2['close'], lv=3, n=3), WT(d2['vol'], lv=3, n=3), WT(d2['VWAP'], lv=3, n=3)
-            d2.loc[d2[d2['vol'] != 0].index.tolist(), 'vol'], d2.loc[d2[d2['vol'] != 0].index.tolist(), 'VWAP'] = WT(d2.loc[d2[d2['vol'] != 0].index.tolist(), 'vol'], lv=3, n=3), WT(d2.loc[d2[d2['vol'] != 0].index.tolist(), 'VWAP'], lv=3, n=3)
-            dataset = d2
+            dataset = denoise_feature(d2)
        
     
     dataset['close_lag'] = dataset['close'].shift(1)
@@ -198,178 +255,19 @@ def get_technical_indicators(data, SplitDate=date(2017,9,1), denoise=True):
     dataset = STO(dataset, nk=5, nD=3)
 
     
-    
     dataset = dataset.drop(columns=['20sd', 'close_lag'])
 
     return dataset
 
 
-##Compute Time Feature
-#Transform Intra-monthly Period by linear function
-def IntraMonth(row, month_dict):
-    y, m, date = row["ts"].year, row["ts"].month, row["ts"].date()
-    d = month_dict[y][m]
-    total = len(d)
-    day = month_dict[y][m][date]
-    time = day/(total - 1)
+
+def validation_split(X_train, Y_train, step=20):
+    length = len(X_train)//step
+    val_index = [(step * i) - 1 for i in range(1, length + 1, 1)]
+    train_index = [i for i in range(len(X_train)) if i%step != step-1]
+    valX = [X_train[i] for i in val_index]
+    trainX = [X_train[i] for i in train_index]
+    valY = [Y_train[i] for i in val_index]
+    trainY = [Y_train[i] for i in train_index]
     
-    return time
-
-#Transform Intra-monthly feature to categorical (5 categories)
-def MonthPeriod(row):
-    num = row["Intramonth"]
-    if num < 0.2:
-        return 1
-    elif num < 0.4:
-        return 2
-    elif num < 0.6:
-        return 3
-    elif num < 0.8:
-        return 4
-    else:
-        return 5
-
-#Transform week information by linear function
-def WeekTime(row):
-    y, m, d, date = row["ts"].year, row["ts"].month, row["ts"].day, row["ts"].date()
-    week = date.isocalendar()[1] - date.replace(day=1).isocalendar()[1] + 1
-
-    if week < 0:
-        if m == 1:
-            week = date.isocalendar()[1] + 1
-        else:
-            week = date.replace(day = d-7).isocalendar()[1] - date.replace(day=1).isocalendar()[1] + 2
-        
-    total = len(calendar.monthcalendar(y, m))
-    week_time = (week - 1)/(total - 1)
-
-    return week_time
-
-#Transform Month to Categorical Feature
-def OneHotMonth(data):
-    onehot_encoder = OneHotEncoder(sparse=False)
-    m = np.array(data['Month']).reshape(len(data['Month']), 1)
-    month = onehot_encoder.fit_transform(m)
-
-    data = pd.concat([data, pd.DataFrame(month, columns=['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])], axis=1)
-
-    return data
-
-#Transform Weekday to Categorical Feature
-def OneHotWeekday(data):
-    onehot_encoder = OneHotEncoder(sparse=False)
-    w = np.array(data['Weekday']).reshape(len(data['Weekday']), 1)
-    week = onehot_encoder.fit_transform(w)
-    if len(data['Weekday'].unique()) == 5:
-        data = pd.concat([data, pd.DataFrame(week, columns=['Mon', 'Tue', 'Wed', 'Thu', 'Fri'])], axis=1)
-
-    else:
-        data = pd.concat([data, pd.DataFrame(week, columns=['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'])], axis=1)
-
-    return data
-
-#Transform Intra-month period to Categorical Feature
-def OneHotPeriod(data):
-    onehot_encoder = OneHotEncoder(sparse=False)
-    w = np.array(data["IntramonthPeriod"]).reshape(len(data["IntramonthPeriod"]), 1)
-    week = onehot_encoder.fit_transform(w)
-
-    data = pd.concat([data, pd.DataFrame(week, columns=['First', 'Second', 'Third', 'Fourth', 'Fifth'])], axis=1)
-
-    return data
-
-
-def get_time_feature(df, month_dict):
-    data = df.copy().reset_index(drop=True)
-
-    data["Month"] = data["ts"].dt.month
-    data["Weekday"] = data["ts"].dt.weekday + 1
-
-
-    data["Intramonth"] = data.apply(IntraMonth, month_dict=month_dict, axis=1)
-    data["IntramonthPeriod"] = data.apply(MonthPeriod, axis=1)
-    data["WeekNum"] = data.apply(WeekTime, axis=1)
-
-    return data
-
-
-def categorical_transform(data):
-
-    data = data.reset_index(drop=True)
-
-    data = OneHotMonth(data)
-    data = OneHotWeekday(data)
-    data = OneHotPeriod(data)
-
-    return data
-
-
-
-#Weekly ATR
-def WeeklylabelATR(row):
-    if row['WeeklyReturn'] > row['ATR']:
-        return 'up'
-    elif row['WeeklyReturn'] < (-1) * row['ATR']:
-        return 'down'
-    else:
-        return 'flat'
-
-def Weeklylabel(row):
-    if row['WeeklyReturn'] > 0:
-        return 'up'
-    elif row['WeeklyReturn'] < 0:
-        return 'down'
-    else:
-        return 'flat'
-
-def labelATR(row):
-    if row['return'] > row['ATR']:
-        return 'up'
-    elif row['return'] < (-1) * row['ATR']:
-        return 'down'
-    else:
-        return 'flat'
-
-def label(row):
-    if row['return'] > 0:
-        return 'up'
-    elif row['return'] < 0:
-        return 'down'
-    else:
-        return 'flat'
-
-
-def get_label(data, denoise=True):
-
-    data = data.reset_index(drop=True)
-    if denoise:
-        data['WeeklyReturn'] = data['origin_close'] - data['origin_close'].shift(5)
-    else: 
-        data['WeeklyReturn'] = data['close'] - data['close'].shift(5)
-
-    df = data[data['26ema'].notnull()]
-
-    if len(df) == 0:
-        return df
-
-    else:
-        df['label_weekly_ATR'] = df.apply(WeeklylabelATR, axis=1)
-        df['label_weekly'] = df.apply(Weeklylabel, axis=1)
-        df['label_ATR'] = df.apply(labelATR, axis=1)
-        df['label'] = df.apply(label, axis=1)
-    
-        return df
-
-
-def ClusterSplit(clusterdata, data, cluster_num, filepath):
-
-    '''
-    Split data into different clusters.
-    Input the dataframe containing labels(clusterdata), dataframe containing all stocks, total cluster and writing path
-    '''
-
-    for i in tqdm(range(cluster_num)):
-        stock_list = clusterdata[clusterdata['cluster'] == i].index.tolist()
-        df = data[data['StockName'].isin(stock_list)]
-
-        df.to_csv(filepath + 'Cluster_{}.csv'.format(i), index=False)
+    return trainX, trainY, valX, valY  
