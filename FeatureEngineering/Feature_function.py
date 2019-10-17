@@ -199,7 +199,7 @@ def get_technical_indicators(data, SplitDate=date(2017,9,1), denoise=True):
 
     
     
-    dataset = dataset.drop(columns=['close_lag', 'open_lag', 'low_lag', 'high_lag', 'total_lag', 'close_next', 'open_next', 'low_next', 'high_next', 'total_next', 'outlier', '20sd'])
+    dataset = dataset.drop(columns=['20sd', 'close_lag'])
 
     return dataset
 
