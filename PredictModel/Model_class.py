@@ -25,7 +25,6 @@ from tensorflow.keras.regularizers import l2
 from xgboost import XGBClassifier, plot_importance
 
 import pickle
-import Model_function as func
 
 
 class CNN_model:

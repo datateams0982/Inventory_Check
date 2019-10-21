@@ -18,7 +18,6 @@ from Model_class import CNN_model, CNN_Tree_Classifier, CNN_Bagging, CNN_Boostin
 class Hyperparameter_Tuning:
     def __init__(self, df, model, CNNparam, Modelparam, max_iter):
 
-        if model = CNN_Tree
         self._df = df
         self._CNNparam = CNNparam
         self._Modelparam = Modelparam
