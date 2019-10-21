@@ -40,7 +40,11 @@
 * Model experiment: CNN, CNN_randomforest, CNN_XGboost
 * Building classes for fine tuning
 
+# 2019/10/21
 
+* Experiment: log transform on OHLCV (perform worse than original)
+* Building class for Basic CNN, CNN_tree, CNN_bagging, CNN_boosting 
+* Build class for hyperparameter tuning (random search)
 
 
 
