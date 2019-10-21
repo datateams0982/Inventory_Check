@@ -3,6 +3,7 @@ import pandas as pd
 # from tqdm import tqdm
 from tqdm import tqdm_notebook as tqdm
 import random
+import os
 # tqdm.pandas()
 
 from sklearn import metrics
@@ -30,18 +31,12 @@ import Model_function as func
 class CNN_model:
 
     def __init__(self, df, CNNparam={'Conv_layer': 3,
-                        'dropout': True,
-                        'Dense': True,
-                        'dropout_ratio': 0.2,
-                        'l1_filter': 64,
-                        'l2_filter': 128,
-                        'l3_filter': 128,
-                        'l1_kernel': 3,
-                        'l2_kernel': 3,
-                        'l3_kernel': 3,
-                        'padding1': 'causal',
-                        'padding2': 'causal',
-                        'padding3': 'causal',
+                        'Dense_layer': 1,
+                        'Dense': [128],
+                        'dropout_ratio': [0.2, 0.2, 0.2],
+                        'filter': [64, 128, 128],
+                        'kernel': [3, 3, 3],
+                        'padding': ['causal', 'causal', 'causal'],
                         'learning_rate': 0.001,
                         'batch': 256,
                         'epochs': 80}):
@@ -55,36 +50,29 @@ class CNN_model:
 
         self._CNN = Sequential()
         self._CNN.add(Conv1D(
-                filters=self._CNNparam['l1_filter'], 
-                kernel_size=self._CNNparam['l1_kernel'], 
+                filters=self._CNNparam['filter'][0], 
+                kernel_size=self._CNNparam['kernel'][0], 
                 activation='relu', 
                 input_shape=(self._X_train.shape[1], self._X_train.shape[2]), 
-                padding=self._CNNparam['padding1']))
-        
-        self._CNN.add(Conv1D(
-                filters=self._CNNparam['l2_filter'], 
-                kernel_size=self._CNNparam['l2_kernel'], 
-                activation='relu',
-                padding=self._CNNparam['padding2']))
-            
-        if (self._CNNparam['dropout']) and (self._CNNparam['Conv_layer'] <= 2):
-            self._CNN.add(Dropout(self._CNNparam['dropout_ratio']))
-        
-        if self._CNNparam['Conv_layer'] > 2:
+                padding=self._CNNparam['padding'][0]))
+
+        for i in range(self._CNNparam['Conv_layer'] - 1):
             self._CNN.add(Conv1D(
-                filters=self._CNNparam['l3_filter'], 
-                kernel_size=self._CNNparam['l3_kernel'], 
+                filters=self._CNNparam['filter'][i+1], 
+                kernel_size=self._CNNparam['kernel'][i+1], 
                 activation='relu',
-                padding=self._CNNparam['padding3']))
-            if self._CNNparam['dropout']:
-                self._CNN.add(Dropout(self._CNNparam['dropout_ratio']))
+                padding=self._CNNparam['padding'][i+1]))
+
+            self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][i]))
+            
                 
         self._CNN.add(Flatten(name='feature'))
         
-        if self._CNNparam['Dense']:
-            self._CNN.add(Dense(self._CNNparam['Dense']))
-            self._CNN.add(Dropout(self._CNNparam['dropout_ratio']))
-            
+        for i in range(self._CNNparam['Dense_layer'] - 1):
+            self._CNN.add(Dense(self._CNNparam['Dense'][i]))
+            self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][i+self._CNNparam['Conv_layer'] - 1]))
+
+
         self._CNN.add(Dense(2, activation='softmax'))
 
         self._opt = optimizers.Nadam(lr=self._CNNparam['learning_rate'])
@@ -180,19 +168,27 @@ class CNN_model:
             
         return weight_list
     
-    def Evaluation(self):
+    def Evaluation(self, target):
         
-        score = self._CNN.evaluate(self._X_test, self._y_test, batch_size=4096)
-        
-        prediction = self._CNN.predict(self._X_test)
-        y_pred = [item.index(max(item)) for item in prediction.tolist()]
+        prediction = self.predict(target)
+
+        if target == 'train':
+            Y = self._lab_train
+        elif target == 'validation':
+            Y = self._lab_val
+        else:
+            Y = self._lab_test
+
+        fpr, tpr, thresholds = metrics.roc_curve(Y, prediction)
+        auc = metrics.auc(fpr, tpr)
+        accuracy = metrics.accuracy_score(Y, prediction)
         
         target_names = ['down', 'up']
-        report = classification_report(self._lab_test.tolist(), y_pred, target_names=target_names)
+        report = classification_report(Y.tolist(), prediction.tolist(), target_names=target_names)
         
-        return [score, report]
+        return [auc, accuracy, report]
     
-    def prediction(self, target):
+    def predict(self, target):
         
         if target == 'train':
             prediction = self._CNN.predict(self._X_train)
@@ -208,18 +204,16 @@ class CNN_model:
     def Separate_Evaluation(self, target, **kwargs):
         
         if target == 'train':
-            prediction = self._CNN.predict(self._X_train)
+            prediction = self.predict(target)
             Real = self._Y_train
             
         elif target == 'validation':
-            prediction = self._CNN.predict(self._X_val)
+            prediction = self.predict(target)
             Real = self._Y_val
             
         else:
-            prediction = self._CNN.predict(self._X_test)
+            prediction = self.predict(target)
             Real = self._Y_test
-            
-        y_pred = [item.index(max(item)) for item in prediction.tolist()]
 
         
         if len(kwargs.keys()) == 1:
@@ -250,23 +244,41 @@ class CNN_model:
 
         return report, accuracy
 
+    def Overall_Evaluation(self, target, threshold=0.6):
+
+        if target  == 'train':
+            stock = [sublist[1] for sublist in self._Y_train]
+
+        elif target == 'validation':
+            stock = [sublist[1] for sublist in self._Y_val]
+
+        else:
+            stock = [sublist[1] for sublist in self._Y_test]
+
+        acc = []
+
+
+        for s in stock:
+            r, a = self.Separate_Evaluation(target, stock=s)
+            acc.append(a)
+            
+
+
+        rate = len([0 for i in acc if i < threshold])/len(acc)
+
+        return 
+
 
 class CNN_Tree_Classifier(CNN_model):
 
-    def __init__(self, df, classifier, 
+    def __init__(self, df, classifier='xgboost', 
                         CNNparam={'Conv_layer': 3,
-                                        'dropout': True,
-                                        'Dense': True,
-                                        'dropout_ratio': 0.2,
-                                        'l1_filter': 64,
-                                        'l2_filter': 128,
-                                        'l3_filter': 128,
-                                        'l1_kernel': 3,
-                                        'l2_kernel': 3,
-                                        'l3_kernel': 3,
-                                        'padding1': 'causal',
-                                        'padding2': 'causal',
-                                        'padding3': 'causal',
+                                        'Dense_layer': 1,
+                                        'Dense': [128],
+                                        'dropout_ratio': [0.2, 0.2, 0.2],
+                                        'filter': [64, 128, 128],
+                                        'kernel': [3, 3, 3],
+                                        'padding': ['causal', 'causal', 'causal'],
                                         'learning_rate': 0.001,
                                         'batch': 256,
                                         'epochs': 80}, 
@@ -305,7 +317,8 @@ class CNN_Tree_Classifier(CNN_model):
                                                 max_depth=self._Classifierparam['n_estimators'], 
                                                 gamma=self._Classifierparam['gamma'],
                                                 eta=self._Classifierparam['eta'],
-                                                updater='grow_gpu_hist')
+                                                tree_method='hist',
+                                                gpu_id=0)
             
     
             
@@ -337,33 +350,25 @@ class CNN_Tree_Classifier(CNN_model):
         if self.type == 'randomforest':
             self._classifier.fit(self._training_feature, self._lab_train)
         elif self.type == 'xgboost':
-            self._classifier.fit(self._training_feature_, self._lab_train, eval_set = [(self._training_feature_, self._lab_train), (self._val_feature_, self._lab_val)], verbose=True, eval_metric='auc')
+            self._classifier.fit(self._training_feature, self._lab_train, eval_set = [(self._training_feature, self._lab_train), (self._val_feature, self._lab_val)], verbose=True, eval_metric='auc')
 
     def save_model(self, path):
         
-        with open(f'{path}', 'wb') as fp:
+        with open(f'{path}classifier', 'wb') as fp:
             joblib.dump(self._classifier, fp) 
-            
-    def load_model(self, model_path):
+
+        self._CNN.save(f'{path}CNN.h5')
         
-        with open(model_path, 'rb') as fp:
+            
+    def load_model(self, path):
+        
+        with open(f'{path}classifier', 'rb') as fp:
             self._classifier = joblib.load(fp)
 
-    def Evaluation(self):
-        
-        prediction = self._classifier.predict(self._testing_feature)
-        
-        fpr, tpr, thresholds = metrics.roc_curve(self._lab_test, prediction)
-        auc = metrics.auc(fpr, tpr)
-        accuracy = metrics.accuracy_score(self._lab_test, prediction)
-        
-        target_names = ['down', 'up']
-        report = classification_report(self._lab_test.tolist(), prediction.tolist(), target_names=target_names)
-        
-        return [auc, accuracy, report]
+        self._CNN = tf.keras.models.load_model(f'{path}CNN.h5')
+        self.Feature_extraction()
     
-    
-    def prediction(self, target):
+    def predict(self, target):
         
         if target == 'train':
             prediction = self._classifier.predict(self._training_feature)
@@ -375,56 +380,12 @@ class CNN_Tree_Classifier(CNN_model):
         return prediction
     
     
-    def Separate_Evaluation(self, target, **kwargs):
-        
-        if target == 'train':
-            prediction = self._classifier.predict(self._training_feature)
-            Real = self._Y_train
-            
-        elif target == 'validation':
-            prediction = self._classifier.predict(self._val_feature)
-            Real = self._Y_val
-            
-        else:
-            prediction = self._classifier.predict(self._testing_feature)
-            Real = self._Y_test
-            
-        y_pred = prediction.tolist()
-        
-        if len(kwargs.keys()) == 1:
-            if 'year' in kwargs:
-                value = kwargs['year']
-                y_true = [sublist[2] for sublist in Real if sublist[0].year == value]  
-                y_index = [i for i, sublist in enumerate(Real) if sublist[0].year == value]
-            else:
-                value = kwargs['stock']
-                y_true = [sublist[2] for sublist in Real if sublist[1] == value]  
-                y_index = [i for i, sublist in enumerate(Real) if sublist[1] == value]
-
-        else:
-            year = kwargs['year']
-            stock = kwargs['stock']
-            y_true = [sublist[2] for sublist in Real if (sublist[0].year == year) and (sublist[1] == stock)]  
-            y_index = [i for i, sublist in enumerate(Real) if (sublist[0].year == year) and (sublist[1] == stock)]
-
-        y = [y_pred[i] for i in y_index]
-        
-        
-                
-        target_names = ['down', 'up']
-        
-        report = classification_report(y_true, y, target_names=target_names)
-        accuracy = metrics.accuracy_score(y_true, y)
-        
-
-        return report, accuracy
      
 
 class CNN_Bagging(CNN_model):
 
     def __init__(self, df, verbose=1,
                         Param={'n_estimator': 100,
-                                'col_sample': 1.0,
                                 'subsample': 0.8},
                         CNNparam={'Conv_layer': 3,
                                     'dropout': True,
@@ -443,14 +404,260 @@ class CNN_Bagging(CNN_model):
                                     'batch': 256,
                                     'epochs': 80}):
 
-        super().__init__(df, CNNparam)
+        self._X_train = np.array(df[0])
+        self._Y_train = df[1]
+        self._X_val = np.array(df[2])
+        self._Y_val = df[3]
+        self._X_test = np.array(df[4])
+        self._Y_test = df[5]
+        self._CNNparam = CNNparam
         self.n_estimator = Param['n_estimator']
-        self.col_sample = Param['col_sample']
         self.subsample = Param['subsample']
+        self._total = len(self._X_train)
+        self._sample_size = int(self._total*self.subsample)
 
 
-    def Bootstrap(self):
+    def _Bootstrap(self):
 
-        total = len(self._X_train)
-        sample_size = 
-        index = [random.randint(0, total-1) for i in range(0, )]
+        index = random.sample(range(self._total), self._sample_size)
+
+        X_batch = self._X_train[index]
+        Y_batch = self._y_train[index]
+
+        return X_batch, Y_batch
+
+    def CNN_train(self):
+
+        self.model_list = []
+        
+        for i in tqdm(range(self.n_estimator), total=self.n_estimator):
+            X, Y = self._Bootstrap()
+
+            self._CNN = Sequential()
+            self._CNN.add(Conv1D(
+                filters=self._CNNparam['filter'][0], 
+                kernel_size=self._CNNparam['kernel'][0], 
+                activation='relu', 
+                input_shape=(self._X_train.shape[1], self._X_train.shape[2]), 
+                padding=self._CNNparam['padding'][0]))
+
+            for i in range(self._CNNparam['Conv_layer'] - 1):
+                self._CNN.add(Conv1D(
+                    filters=self._CNNparam['filter'][i+1], 
+                    kernel_size=self._CNNparam['kernel'][i+1], 
+                    activation='relu',
+                    padding=self._CNNparam['padding'][i+1]))
+
+                self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][i]))
+            
+                
+            self._CNN.add(Flatten(name='feature'))
+        
+            for i in range(self._CNNparam['Dense_layer'] - 1):
+                self._CNN.add(Dense(self._CNNparam['Dense'][i]))
+                self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][i+self._CNNparam['Conv_layer'] - 1]))
+
+
+            self._CNN.add(Dense(2, activation='softmax'))
+
+            self._opt = optimizers.Nadam(lr=self._CNNparam['learning_rate'])
+            self._CNN.compile(loss='categorical_crossentropy', optimizer=self._opt, metrics=[tf.keras.metrics.AUC()])
+
+            self._CNN.fit(X, Y, validation_data=(self._X_val, self._y_val), batch_size=self._CNNparam['batch'], epochs=self._CNNparam['epochs'], verbose=2)
+            self.model_list.append(self._CNN)
+
+    def load_model(self, path):
+
+        model_list = os.listdir(path)
+        self.model_list = []
+
+        for model in model_list:
+            m = tf.keras.models.load_model(path)  
+            self.model_list.append(m)
+        
+    def save_model(self, path):
+        
+        for i, model in enumerate(self.model_list):
+            model.save(f'{path}{i}.h5')
+
+
+    def predict(self, target='test'):
+
+        if target == 'train':
+            X = self._X_train
+            Y = self._Y_train
+
+        elif target == 'validation':
+            X = self._X_val
+            Y = self._Y_val
+
+        else:
+            X = self._X_test
+            Y = self._Y_test
+
+        self.prediction_list = []
+        for model in self.model_list:
+            p = model.predict(X)
+            pred = [item.index(max(item)) for item in p.tolist()]
+            self.prediction_list.append(pred)
+
+        vote = sum(np.array(self.prediction_list))
+        threshold = int(self.n_estimator/2)
+        prediction = np.array([1 if v > threshold else 0 for v in vote])
+
+        return prediction
+
+
+
+
+class CNN_Boosting(CNN_model):
+
+    def __init__(self, df, verbose=1,
+                        Param={'n_estimator': 100,
+                                'subsample': 0.8},
+                        CNNparam={'Conv_layer': 3,
+                                    'dropout': True,
+                                    'Dense': True,
+                                    'dropout_ratio': 0.2,
+                                    'l1_filter': 64,
+                                    'l2_filter': 128,
+                                    'l3_filter': 128,
+                                    'l1_kernel': 3,
+                                    'l2_kernel': 3,
+                                    'l3_kernel': 3,
+                                    'padding1': 'causal',
+                                    'padding2': 'causal',
+                                    'padding3': 'causal',
+                                    'learning_rate': 0.001,
+                                    'batch': 256,
+                                    'epochs': 80}):
+
+        self._X_train = np.array(df[0])
+        self._Y_train = df[1]
+        self._X_val = np.array(df[2])
+        self._Y_val = df[3]
+        self._X_test = np.array(df[4])
+        self._Y_test = df[5]
+        self._CNNparam = CNNparam
+        self.n_estimator = Param['n_estimator']
+        self.subsample = Param['subsample']
+        self._total = len(self._X_train)
+        self._sample_size = int(self._total*self.subsample)
+        self._weight = np.array([1/self._total for i in range(self._total)])
+
+
+    def _Boosting(self):
+
+        self._weight = self._weight / self._weight.sum(dtype=np.float64)
+
+        select_index = np.random.choice(self._total, self._sample_size, p=self._weight, replace=False).tolist()
+
+        X = self._X_train[select_index]
+        Y = self._y_train[select_index]
+
+        return X, Y
+
+    def _reweight(self):
+
+        score = self._CNN.evaluate(self._X_train, self._y_train, batch_size=4080)
+        error = 1 - score[0]
+        pred = self._CNN.predict(self._X_train)
+        prediction = [item.index(max(item)) for item in pred.tolist()]
+        weight = ((1 - error)/error) ** (1/2)
+        new_weight = np.array([self._weight[i] * weight if prediction[i] != self._lab_train[i] else self._weight[i] / weight for i in range(self._total)])
+
+        return weight, new_weight
+
+
+    def CNN_train(self):
+        
+        self.model_list = []
+        self._vote_weight = []
+
+        for i in tqdm(range(self.n_estimator), total=self.n_estimator):
+            X, Y = self._Boosting()
+
+            self._CNN = Sequential()
+            self._CNN.add(Conv1D(
+                filters=self._CNNparam['filter'][0], 
+                kernel_size=self._CNNparam['kernel'][0], 
+                activation='relu', 
+                input_shape=(self._X_train.shape[1], self._X_train.shape[2]), 
+                padding=self._CNNparam['padding'][0]))
+
+            for i in range(self._CNNparam['Conv_layer'] - 1):
+                self._CNN.add(Conv1D(
+                    filters=self._CNNparam['filter'][i+1], 
+                    kernel_size=self._CNNparam['kernel'][i+1], 
+                    activation='relu',
+                    padding=self._CNNparam['padding'][i+1]))
+
+                self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][i]))
+            
+                
+            self._CNN.add(Flatten(name='feature'))
+        
+            for i in range(self._CNNparam['Dense_layer'] - 1):
+                self._CNN.add(Dense(self._CNNparam['Dense'][i]))
+                self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][i+self._CNNparam['Conv_layer'] - 1]))
+
+
+            self._CNN.add(Dense(2, activation='softmax'))
+
+            self._opt = optimizers.Nadam(lr=self._CNNparam['learning_rate'])
+            self._CNN.compile(loss='categorical_crossentropy', optimizer=self._opt, metrics=['acc'])
+
+            self._CNN.fit(X, Y, validation_data=(self._X_val, self._y_val), batch_size=self._CNNparam['batch'], epochs=self._CNNparam['epochs'], verbose=2)
+            self.model_list.append(self._CNN)
+            weight, self._weight = self._reweight()
+            self._vote_weight.append(weight)
+
+            
+
+    def load_model(self, model_path, weight_path):
+
+        model_list = os.listdir(model_path)
+        self.model_list = []
+
+        for model in model_list:
+            m = tf.keras.models.load_model(model_path)  
+            self.model_list.append(m)
+
+        with open(weight_path, 'rb') as fp:
+            self._vote_weight = pickle.load(fp)
+        
+        
+    def save_model(self, model_path, weight_path):
+        
+        for i, model in enumerate(self.model_list):
+            model.save(f'{model_path}{i}.h5')
+        
+        with open(weight_path, 'wb') as fp:
+            pickle.dump(self._vote_weight, fp)
+
+
+    def predict(self, target='test'):
+
+        if target == 'train':
+            X = self._X_train
+
+        elif target == 'validation':
+            X = self._X_val
+
+        else:
+            X = self._X_test
+
+        self.prediction_list = []
+        for model in self.model_list:
+            p = model.predict(X)
+            pred = [item.index(max(item)) for item in p.tolist()]
+            self.prediction_list.append(pred)
+
+        vote = sum([item * rate for item, rate in zip(np.array(self.prediction_list), np.array(self._vote_weight))])/sum(np.array(self._vote_weight))
+        threshold = 0.5
+        prediction = np.array([1 if v > threshold else 0 for v in vote])
+
+        return prediction
+
+
+    

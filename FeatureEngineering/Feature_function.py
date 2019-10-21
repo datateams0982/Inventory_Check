@@ -204,7 +204,7 @@ def get_technical_indicators(data, SplitDate=date(2017,9,1), denoise=True):
     data = data.reset_index(drop=True).sort_values(by='ts')
 
     data['VWAP'] = data.apply(VWAP, axis=1)
-
+       
 
     if denoise:
         d1 = data[data['ts'] < SplitDate].reset_index(drop=True)
