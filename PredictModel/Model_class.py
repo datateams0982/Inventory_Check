@@ -12,6 +12,9 @@ from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.externals import joblib
 
+from multiprocessing.pool import ThreadPool
+import time
+
 
 import tensorflow as tf
 from tensorflow.keras.preprocessing.sequence import pad_sequences
@@ -25,6 +28,8 @@ from tensorflow.keras.regularizers import l2
 from xgboost import XGBClassifier, plot_importance
 
 import pickle
+import sys
+
 
 
 class CNN_model:
@@ -46,6 +51,10 @@ class CNN_model:
         self._X_test = np.array(df[4])
         self._Y_test = df[5]
         self._CNNparam = CNNparam
+
+        self._gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.3)
+        self._sess = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(gpu_options=self._gpu_options))
+        tf.compat.v1.keras.backend.set_session(self._sess)
 
         self._CNN = Sequential()
         self._CNN.add(Conv1D(
@@ -167,7 +176,7 @@ class CNN_model:
             
         return weight_list
     
-    def Evaluation(self, target):
+    def Evaluation(self, target='test'):
         
         prediction = self.predict(target)
 
@@ -187,7 +196,7 @@ class CNN_model:
         
         return [auc, accuracy, report]
     
-    def predict(self, target):
+    def predict(self, target='test'):
         
         if target == 'train':
             prediction = self._CNN.predict(self._X_train)
@@ -200,7 +209,7 @@ class CNN_model:
             
         return y_pred
     
-    def Separate_Evaluation(self, target, **kwargs):
+    def Separate_Evaluation(self, target='test', **kwargs):
         
         if target == 'train':
             prediction = self.predict(target)
@@ -231,7 +240,7 @@ class CNN_model:
             y_true = [sublist[2] for sublist in Real if (sublist[0].year == year) and (sublist[1] == stock)]  
             y_index = [i for i, sublist in enumerate(Real) if (sublist[0].year == year) and (sublist[1] == stock)]
 
-        y = [y_pred[i] for i in y_index]
+        y = [prediction[i] for i in y_index]
         
 
                 
@@ -243,7 +252,7 @@ class CNN_model:
 
         return report, accuracy
 
-    def Overall_Evaluation(self, target, threshold=0.6):
+    def Overall_Evaluation(self, target='test', threshold=0.6):
 
         if target  == 'train':
             stock = [sublist[1] for sublist in self._Y_train]
@@ -265,7 +274,8 @@ class CNN_model:
 
         rate = len([0 for i in acc if i < threshold])/len(acc)
 
-        return 
+        return rate
+
 
 
 class CNN_Tree_Classifier(CNN_model):
@@ -292,9 +302,17 @@ class CNN_Tree_Classifier(CNN_model):
                                         'max_depth': 6, 
                                         'gamma': 0.01,
                                         'eta': 0.1}):
-        super().__init__(df, CNNparam)
+
+        super(CNN_Tree_Classifier, self).__init__(df, CNNparam) 
+
+        self._training_feature = []
+        self._val_feature = []
+        self._testing_feature = []
+
+        
         
         self.type = classifier.lower()
+        
         
         if classifier.lower() == 'randomforest':
             self._Classifierparam = rf_param
@@ -316,17 +334,25 @@ class CNN_Tree_Classifier(CNN_model):
                                                 max_depth=self._Classifierparam['n_estimators'], 
                                                 gamma=self._Classifierparam['gamma'],
                                                 eta=self._Classifierparam['eta'],
-                                                tree_method='hist',
+                                                #tree_method='gpu_hist',
                                                 gpu_id=0)
             
     
-            
+
+
+    def CNN_train(self):
+
+        self._CNN.fit(self._X_train, self._y_train, validation_data=(self._X_val, self._y_val), batch_size=self._CNNparam['batch'], epochs=self._CNNparam['epochs'], verbose=2)
+
+
     def Feature_extraction(self):
+
         intermediate_layer_model = Model(inputs=self._CNN.input, outputs=self._CNN.get_layer('feature').output)
         self._training_feature = intermediate_layer_model.predict(self._X_train)
         self._val_feature = intermediate_layer_model.predict(self._X_val)
         self._testing_feature = intermediate_layer_model.predict(self._X_test)
-        
+
+
     @property    
     def training_feature(self):
         return self._training_feature
@@ -351,13 +377,13 @@ class CNN_Tree_Classifier(CNN_model):
         elif self.type == 'xgboost':
             self._classifier.fit(self._training_feature, self._lab_train, eval_set = [(self._training_feature, self._lab_train), (self._val_feature, self._lab_val)], verbose=True, eval_metric='auc')
 
+
     def save_model(self, path):
         
         with open(f'{path}classifier', 'wb') as fp:
             joblib.dump(self._classifier, fp) 
-
-        self._CNN.save(f'{path}CNN.h5')
         
+        self._CNN.save(f'{path}CNN.h5')
             
     def load_model(self, path):
         
@@ -366,8 +392,9 @@ class CNN_Tree_Classifier(CNN_model):
 
         self._CNN = tf.keras.models.load_model(f'{path}CNN.h5')
         self.Feature_extraction()
+
     
-    def predict(self, target):
+    def predict(self, target='test'):
         
         if target == 'train':
             prediction = self._classifier.predict(self._training_feature)
@@ -426,9 +453,9 @@ class CNN_Bagging(CNN_model):
         return X_batch, Y_batch
 
     def CNN_train(self):
-
-        self.model_list = []
         
+        self.model_list = []
+
         for i in tqdm(range(self.n_estimator), total=self.n_estimator):
             X, Y = self._Bootstrap()
 
@@ -440,21 +467,21 @@ class CNN_Bagging(CNN_model):
                 input_shape=(self._X_train.shape[1], self._X_train.shape[2]), 
                 padding=self._CNNparam['padding'][0]))
 
-            for i in range(self._CNNparam['Conv_layer'] - 1):
+            for j in range(self._CNNparam['Conv_layer'] - 1):
                 self._CNN.add(Conv1D(
-                    filters=self._CNNparam['filter'][i+1], 
-                    kernel_size=self._CNNparam['kernel'][i+1], 
+                    filters=self._CNNparam['filter'][j+1], 
+                    kernel_size=self._CNNparam['kernel'][j+1], 
                     activation='relu',
-                    padding=self._CNNparam['padding'][i+1]))
+                    padding=self._CNNparam['padding'][j+1]))
 
-                self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][i]))
+                self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][j]))
             
                 
             self._CNN.add(Flatten(name='feature'))
         
-            for i in range(self._CNNparam['Dense_layer'] - 1):
-                self._CNN.add(Dense(self._CNNparam['Dense'][i]))
-                self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][i+self._CNNparam['Conv_layer'] - 1]))
+            for j in range(self._CNNparam['Dense_layer'] - 1):
+                self._CNN.add(Dense(self._CNNparam['Dense'][j]))
+                self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][j+self._CNNparam['Conv_layer'] - 1]))
 
 
             self._CNN.add(Dense(2, activation='softmax'))
@@ -463,6 +490,7 @@ class CNN_Bagging(CNN_model):
             self._CNN.compile(loss='categorical_crossentropy', optimizer=self._opt, metrics=[tf.keras.metrics.AUC()])
 
             self._CNN.fit(X, Y, validation_data=(self._X_val, self._y_val), batch_size=self._CNNparam['batch'], epochs=self._CNNparam['epochs'], verbose=2)
+            
             self.model_list.append(self._CNN)
 
     def load_model(self, path):
@@ -549,7 +577,7 @@ class CNN_Boosting(CNN_model):
 
         self._weight = self._weight / self._weight.sum(dtype=np.float64)
 
-        select_index = np.random.choice(self._total, self._sample_size, p=self._weight, replace=False).tolist()
+        select_index = np.random.choice(self._total, self._sample_size, p=self._weight, replace=True).tolist()
 
         X = self._X_train[select_index]
         Y = self._y_train[select_index]
@@ -558,11 +586,10 @@ class CNN_Boosting(CNN_model):
 
     def _reweight(self):
 
-        score = self._CNN.evaluate(self._X_train, self._y_train, batch_size=4080)
-        error = 1 - score[0]
         pred = self._CNN.predict(self._X_train)
         prediction = [item.index(max(item)) for item in pred.tolist()]
-        weight = ((1 - error)/error) ** (1/2)
+        error = sum(np.array([self._weight[i] for i in range(self._total) if prediction[i] != self._lab_train[i]]))
+        weight =  ((1 - error)/error)**(1/2)
         new_weight = np.array([self._weight[i] * weight if prediction[i] != self._lab_train[i] else self._weight[i] / weight for i in range(self._total)])
 
         return weight, new_weight
@@ -574,8 +601,10 @@ class CNN_Boosting(CNN_model):
         self._vote_weight = []
 
         for i in tqdm(range(self.n_estimator), total=self.n_estimator):
-            X, Y = self._Boosting()
-
+            if i != 0:
+                X, Y = self._Boosting()
+            else:
+                X, Y = self._X_train, self._y_train
             self._CNN = Sequential()
             self._CNN.add(Conv1D(
                 filters=self._CNNparam['filter'][0], 
@@ -584,21 +613,21 @@ class CNN_Boosting(CNN_model):
                 input_shape=(self._X_train.shape[1], self._X_train.shape[2]), 
                 padding=self._CNNparam['padding'][0]))
 
-            for i in range(self._CNNparam['Conv_layer'] - 1):
+            for j in range(self._CNNparam['Conv_layer'] - 1):
                 self._CNN.add(Conv1D(
-                    filters=self._CNNparam['filter'][i+1], 
-                    kernel_size=self._CNNparam['kernel'][i+1], 
+                    filters=self._CNNparam['filter'][j+1], 
+                    kernel_size=self._CNNparam['kernel'][j+1], 
                     activation='relu',
-                    padding=self._CNNparam['padding'][i+1]))
+                    padding=self._CNNparam['padding'][j+1]))
 
-                self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][i]))
+                self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][j]))
             
                 
             self._CNN.add(Flatten(name='feature'))
         
-            for i in range(self._CNNparam['Dense_layer'] - 1):
-                self._CNN.add(Dense(self._CNNparam['Dense'][i]))
-                self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][i+self._CNNparam['Conv_layer'] - 1]))
+            for j in range(self._CNNparam['Dense_layer'] - 1):
+                self._CNN.add(Dense(self._CNNparam['Dense'][j]))
+                self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][j+self._CNNparam['Conv_layer'] - 1]))
 
 
             self._CNN.add(Dense(2, activation='softmax'))
