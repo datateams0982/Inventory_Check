@@ -46,6 +46,9 @@
 * Building class for Basic CNN, CNN_tree, CNN_bagging, CNN_boosting 
 * Build class for hyperparameter tuning (random search)
 
+# 2019/10/22
 
+* Solving memory problem for CNN-XGBoost (two script, slow, use random forest only?)
+* Debug
 
 
