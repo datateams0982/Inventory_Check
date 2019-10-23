@@ -25,8 +25,12 @@ class Hyperparameter_Tuning:
 
     '''
 
-    def __init__(self, df_path, model, CNNparam, Modelparam, max_iter, cluster_num, model_keep=3):
-        
+    def __init__(self, df, model, CNNparam, Modelparam, max_iter, cluster_num, model_keep=3):
+
+        self._df = df
+        self._CNNparam = CNNparam
+        self._Modelparam = Modelparam
+        self._model = model.lower()
 
         assert type(max_iter) is int
         assert type(cluster_num) is int
@@ -34,14 +38,6 @@ class Hyperparameter_Tuning:
 
         if max_iter < model_keep:
             raise ValueError('Iteration should be larger than model kept')
-
-
-        with open(f'{df_path}Cluster_{cluster_num}_classification_minmax0_Weekly', 'rb') as fp:
-            self._df = pickle.load(fp)
-
-        self._CNNparam = CNNparam
-        self._Modelparam = Modelparam
-        self._model = model.lower()
 
         self._iter = max_iter
         self._cluster = cluster_num
@@ -209,7 +205,6 @@ class Hyperparameter_Tuning:
         '''
         Save optimal models
         '''
-        self.results.to_csv(f'D:\\庫存健診開發\\data\\Tuning_Result\\{self._model}.csv', index=False)
 
         if 'tree' in self._model:
             for i in tqdm(range(len(self.optimal))):
@@ -233,7 +228,6 @@ class Hyperparameter_Tuning:
         '''
         load all optimal models
         '''
-        self.results = pd.read_csv(f'D:\\庫存健診開發\\data\\Tuning_Result\\{self._model}.csv')
 
         if 'tree' in self._model:
             for i in range(1, self._num+1):
@@ -265,8 +259,6 @@ class Hyperparameter_Tuning:
 
         assert target in ['train', 'validation', 'test']
         assert type(i) is int
-        if i > self._num:
-            raise ValueError(f'Only {self._num} models kept')
 
         prediction = self.optimal[i-1].predict(target)
 
@@ -283,9 +275,6 @@ class Hyperparameter_Tuning:
 
         assert target in ['train', 'validation', 'test']
         assert type(i) is int
-        if i > self._num:
-            raise ValueError(f'Only {self._num} models kept')
-
 
         score = self.optimal[i-1].Evaluation(target)
 
@@ -301,9 +290,6 @@ class Hyperparameter_Tuning:
 
         assert target in ['train', 'validation', 'test']
         assert type(i) is int
-        if i > self._num:
-            raise ValueError(f'Only {self._num} models kept')
-
 
         report, acc = self.optimal[i-1].Separate_Evaluation(target, kwargs)
 
@@ -322,9 +308,6 @@ class Hyperparameter_Tuning:
         assert target in ['train', 'validation', 'test']
         assert threshold <= 1
         assert type(i) is int
-        if i > self._num:
-            raise ValueError(f'Only {self._num} models kept')
-
 
         balance_acc, balance_auc = self.optimal[i-1].Overall_Evaluation(target, verbose=verbose, threshold=threshold)
 

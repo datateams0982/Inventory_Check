@@ -59,7 +59,41 @@ class CNN_model:
         self._X_test = np.array(df[4])
         self._Y_test = df[5]
         self._CNNparam = CNNparam
-        self._CNN = []
+
+        self._gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.3)
+        self._sess = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(gpu_options=self._gpu_options))
+        tf.compat.v1.keras.backend.set_session(self._sess)
+
+        self._CNN = Sequential()
+        self._CNN.add(Conv1D(
+                filters=self._CNNparam['filter'][0], 
+                kernel_size=self._CNNparam['kernel'][0], 
+                activation='relu', 
+                input_shape=(self._X_train.shape[1], self._X_train.shape[2]), 
+                padding=self._CNNparam['padding'][0]))
+
+        for i in range(self._CNNparam['Conv_layer'] - 1):
+            self._CNN.add(Conv1D(
+                filters=self._CNNparam['filter'][i+1], 
+                kernel_size=self._CNNparam['kernel'][i+1], 
+                activation='relu',
+                padding=self._CNNparam['padding'][i+1]))
+
+            self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][i]))
+            
+                
+        self._CNN.add(Flatten(name='feature'))
+        
+        for i in range(self._CNNparam['Dense_layer'] - 1):
+            self._CNN.add(Dense(self._CNNparam['Dense'][i]))
+            self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][i+self._CNNparam['Conv_layer'] - 1]))
+
+
+        self._CNN.add(Dense(2, activation='softmax'))
+
+        self._opt = optimizers.Nadam(lr=self._CNNparam['learning_rate'])
+        self._CNN.compile(loss='categorical_crossentropy', optimizer=self._opt, metrics=[tf.keras.metrics.AUC()])
+        
     
     
     @property
@@ -139,35 +173,7 @@ class CNN_model:
         Training CNN
     
         '''
-        self._CNN = Sequential()
-        self._CNN.add(Conv1D(
-                filters=self._CNNparam['filter'][0], 
-                kernel_size=self._CNNparam['kernel'][0], 
-                activation='relu', 
-                input_shape=(self._X_train.shape[1], self._X_train.shape[2]), 
-                padding=self._CNNparam['padding'][0]))
-
-        for i in range(self._CNNparam['Conv_layer'] - 1):
-            self._CNN.add(Conv1D(
-                filters=self._CNNparam['filter'][i+1], 
-                kernel_size=self._CNNparam['kernel'][i+1], 
-                activation='relu',
-                padding=self._CNNparam['padding'][i+1]))
-
-            self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][i]))
-            
-                
-        self._CNN.add(Flatten(name='feature'))
         
-        for i in range(self._CNNparam['Dense_layer'] - 1):
-            self._CNN.add(Dense(self._CNNparam['Dense'][i]))
-            self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][i+self._CNNparam['Conv_layer'] - 1]))
-
-
-        self._CNN.add(Dense(2, activation='softmax'))
-
-        self._opt = optimizers.Nadam(lr=self._CNNparam['learning_rate'])
-        self._CNN.compile(loss='categorical_crossentropy', optimizer=self._opt, metrics=[tf.keras.metrics.AUC()])
         self._get_dependent_variable()
         self._CNN.fit(self._X_train, self._y_train, validation_data=(self._X_val, self._y_val), batch_size=self._CNNparam['batch'], epochs=self._CNNparam['epochs'], verbose=2)
 
@@ -185,7 +191,7 @@ class CNN_model:
         
     def save_CNN(self, path):
         
-        tf.compat.v1.keras.models.save_model(self._CNN, f'{path}.h5')
+        self._CNN.save(f'{path}.h5')
         
     def get_layer_weight(self):
         
@@ -239,7 +245,6 @@ class CNN_model:
         y_pred = [item.index(max(item)) for item in prediction.tolist()]
             
         return y_pred
-
     
     def Separate_Evaluation(self, target='test', **kwargs):
 
@@ -394,7 +399,6 @@ class CNN_Tree_Classifier(CNN_model):
         self._training_feature = []
         self._val_feature = []
         self._testing_feature = []
-        self._classifier = []
 
         
         self.type = classifier.lower()
@@ -402,11 +406,26 @@ class CNN_Tree_Classifier(CNN_model):
         
         if classifier.lower() == 'randomforest':
             self._Classifierparam = rf_param
+                                        
+            self._classifier = RandomForestClassifier(n_estimators=self._Classifierparam['n_estimators'], 
+                                                        max_depth=self._Classifierparam['n_estimators'],
+                                                        max_features=self._Classifierparam['max_features'],
+                                                        min_samples_leaf=self._Classifierparam['min_samples_leaf'], 
+                                                        min_samples_split=self._Classifierparam['min_samples_split'],
+                                                        verbose=0, 
+                                                        n_jobs=-1)
 
         elif classifier.lower() == 'xgboost':
             self._Classifierparam = xgbc_param
 
-
+            self._classifier = XGBClassifier(colsample_bytree=self._Classifierparam['colsample_bytree'],
+                                                subsample=self._Classifierparam['subsample'],
+                                                n_estimators=self._Classifierparam['n_estimators'], 
+                                                max_depth=self._Classifierparam['n_estimators'], 
+                                                gamma=self._Classifierparam['gamma'],
+                                                eta=self._Classifierparam['eta'],
+                                                #tree_method='gpu_hist',
+                                                gpu_id=0)
 
         else:
             raise ValueError('Classifier should be RandomForest or XGBoost')
@@ -419,35 +438,7 @@ class CNN_Tree_Classifier(CNN_model):
         '''
         Not need to call independently
         '''
-        self._CNN = Sequential()
-        self._CNN.add(Conv1D(
-                filters=self._CNNparam['filter'][0], 
-                kernel_size=self._CNNparam['kernel'][0], 
-                activation='relu', 
-                input_shape=(self._X_train.shape[1], self._X_train.shape[2]), 
-                padding=self._CNNparam['padding'][0]))
-
-        for i in range(self._CNNparam['Conv_layer'] - 1):
-            self._CNN.add(Conv1D(
-                filters=self._CNNparam['filter'][i+1], 
-                kernel_size=self._CNNparam['kernel'][i+1], 
-                activation='relu',
-                padding=self._CNNparam['padding'][i+1]))
-
-            self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][i]))
-            
-                
-        self._CNN.add(Flatten(name='feature'))
         
-        for i in range(self._CNNparam['Dense_layer'] - 1):
-            self._CNN.add(Dense(self._CNNparam['Dense'][i]))
-            self._CNN.add(Dropout(self._CNNparam['dropout_ratio'][i+self._CNNparam['Conv_layer'] - 1]))
-
-
-        self._CNN.add(Dense(2, activation='softmax'))
-
-        self._opt = optimizers.Nadam(lr=self._CNNparam['learning_rate'])
-        self._CNN.compile(loss='categorical_crossentropy', optimizer=self._opt, metrics=[tf.keras.metrics.AUC()])
         self._get_dependent_variable()
         self._CNN.fit(self._X_train, self._y_train, validation_data=(self._X_val, self._y_val), batch_size=self._CNNparam['batch'], epochs=self._CNNparam['epochs'], verbose=2)
 
@@ -492,33 +483,17 @@ class CNN_Tree_Classifier(CNN_model):
         self._Feature_extraction()
         
         if self.type == 'randomforest':
-            self._classifier = RandomForestClassifier(n_estimators=self._Classifierparam['n_estimators'], 
-                                                        max_depth=self._Classifierparam['n_estimators'],
-                                                        max_features=self._Classifierparam['max_features'],
-                                                        min_samples_leaf=self._Classifierparam['min_samples_leaf'], 
-                                                        min_samples_split=self._Classifierparam['min_samples_split'],
-                                                        verbose=0, 
-                                                        n_jobs=-1)
             self._classifier.fit(self._training_feature, self._lab_train)
-
         elif self.type == 'xgboost':
-            self._classifier = XGBClassifier(colsample_bytree=self._Classifierparam['colsample_bytree'],
-                                                subsample=self._Classifierparam['subsample'],
-                                                n_estimators=self._Classifierparam['n_estimators'], 
-                                                max_depth=self._Classifierparam['n_estimators'], 
-                                                gamma=self._Classifierparam['gamma'],
-                                                eta=self._Classifierparam['eta'],
-                                                #tree_method='gpu_hist',
-                                                gpu_id=0)
             self._classifier.fit(self._training_feature, self._lab_train, eval_set = [(self._training_feature, self._lab_train), (self._val_feature, self._lab_val)], verbose=False, eval_metric='auc')
 
 
     def save_model(self, path):
-
-        tf.compat.v1.keras.models.save_model(self._CNN, f'{path}CNN.h5')
         
         with open(f'{path}classifier', 'wb') as fp:
-            joblib.dump(self._classifier, fp)   
+            joblib.dump(self._classifier, fp) 
+        
+        self._CNN.save(f'{path}CNN.h5')
 
             
     def load_model(self, path):
@@ -582,13 +557,17 @@ class CNN_Bagging(CNN_model):
                                     'batch': 256,
                                     'epochs': 80}):
 
-        super(CNN_Bagging, self).__init__(df, CNNparam)
-
+        self._X_train = np.array(df[0])
+        self._Y_train = df[1]
+        self._X_val = np.array(df[2])
+        self._Y_val = df[3]
+        self._X_test = np.array(df[4])
+        self._Y_test = df[5]
+        self._CNNparam = CNNparam
         self.n_estimator = Param['n_estimator']
         self.subsample = Param['subsample']
         self._total = len(self._X_train)
         self._sample_size = int(self._total*self.subsample)
-        self.model_list = []
 
 
     def _Bootstrap(self):
@@ -612,7 +591,8 @@ class CNN_Bagging(CNN_model):
         '''
 
         self._get_dependent_variable()
-    
+        
+        self.model_list = []
 
         for i in tqdm(range(self.n_estimator), total=self.n_estimator):
             X, Y = self._Bootstrap()
@@ -654,6 +634,7 @@ class CNN_Bagging(CNN_model):
     def load_model(self, path):
 
         model_list = os.listdir(path)
+        self.model_list = []
 
         for i, model in enumerate(tqdm(model_list)):
             model_name = path + model
@@ -665,7 +646,7 @@ class CNN_Bagging(CNN_model):
     def save_model(self, path):
         
         for i, model in enumerate(tqdm(self.model_list)):
-            tf.compat.v1.keras.models.save_model(model, f'{path}{i}.h5')
+            model.save(f'{path}{i}.h5')
 
 
     def predict(self, target='test'):
@@ -696,8 +677,8 @@ class CNN_Bagging(CNN_model):
             pred = [item.index(max(item)) for item in p.tolist()]
             self.prediction_list.append(pred)
 
-        vote = sum(np.array(self.prediction_list))/len(self.prediction_list)
-        threshold = 0.5
+        vote = sum(np.array(self.prediction_list))
+        threshold = int(self.n_estimator/2)
         prediction = np.array([1 if v > threshold else 0 for v in vote])
 
         return prediction
@@ -735,15 +716,18 @@ class CNN_Boosting(CNN_model):
                                     'batch': 256,
                                     'epochs': 80}):
 
-        super(CNN_Boosting, self).__init__(df, CNNparam)
-
+        self._X_train = np.array(df[0])
+        self._Y_train = df[1]
+        self._X_val = np.array(df[2])
+        self._Y_val = df[3]
+        self._X_test = np.array(df[4])
+        self._Y_test = df[5]
+        self._CNNparam = CNNparam
         self.n_estimator = Param['n_estimator']
         self.subsample = Param['subsample']
         self._total = len(self._X_train)
         self._sample_size = int(self._total*self.subsample)
         self._weight = np.array([1/self._total for i in range(self._total)])
-        self.model_list = []
-        self._vote_weight = []
 
 
     def _Boosting(self):
@@ -775,7 +759,7 @@ class CNN_Boosting(CNN_model):
         weight =  ((1 - error)/error)**(1/2)
         new_weight = np.array([self._weight[i] * weight if prediction[i] != self._lab_train[i] else self._weight[i] / weight for i in range(self._total)])
 
-        return np.log(weight), new_weight
+        return weight, new_weight
 
 
     def CNN_train(self):
@@ -788,8 +772,10 @@ class CNN_Boosting(CNN_model):
 
         self._get_dependent_variable()
         
+        self.model_list = []
+        self._vote_weight = []
 
-        for i in range(self.n_estimator):
+        for i in tqdm(range(self.n_estimator), total=self.n_estimator):
             if i != 0:
                 X, Y = self._Boosting()
             else:
@@ -839,6 +825,7 @@ class CNN_Boosting(CNN_model):
         '''
 
         model_list = os.listdir(model_path)
+        self.model_list = []
 
         for i, model in enumerate(tqdm(model_list)):
             if model[-2:] != 'h5':
@@ -860,7 +847,7 @@ class CNN_Boosting(CNN_model):
         '''
         
         for i, model in enumerate(tqdm(self.model_list)):
-            tf.compat.v1.keras.models.save_model(model, f'{model_path}{i}.h5')
+            model.save(f'{model_path}{i}.h5')
         
         with open(weight_path, 'wb') as fp:
             pickle.dump(self._vote_weight, fp)
@@ -891,7 +878,7 @@ class CNN_Boosting(CNN_model):
             pred = [item.index(max(item)) for item in p.tolist()]
             self.prediction_list.append(pred)
 
-        vote = sum(np.array([item * rate for item, rate in zip(np.array(self.prediction_list), np.array(self._vote_weight))]))/sum(np.array(self._vote_weight))
+        vote = sum([item * rate for item, rate in zip(np.array(self.prediction_list), np.array(self._vote_weight))])/sum(np.array(self._vote_weight))
         threshold = 0.5
         prediction = np.array([1 if v > threshold else 0 for v in vote])
 
