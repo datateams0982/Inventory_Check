@@ -34,6 +34,14 @@ import sys
 
 class CNN_model:
 
+    '''
+    Build Basic CNN.
+    The type of data should be [X_train, Y_train, X_val, Y_val, X_test, Y_test]
+    The type of X should be a (samplesize, timestamp, feature) list
+    The type of Y should be a [[year, stock, label]] list
+    The type of CNN parameter shoud be a dictionary
+    '''
+
     def __init__(self, df, CNNparam={'Conv_layer': 3,
                         'Dense_layer': 1,
                         'Dense': [128],
@@ -119,6 +127,11 @@ class CNN_model:
     
     def _categorical_transform(self, data):
 
+        '''
+        One Hot Encoding
+        Not need to call independently
+        '''
+
         onehot_encoder = OneHotEncoder(sparse=False)
 
         d = np.array(data).reshape(len(data), 1)
@@ -127,7 +140,12 @@ class CNN_model:
         return Y
     
         
-    def get_dependent_variable(self):
+    def _get_dependent_variable(self):
+
+        '''
+        Transform Y to other form
+        Not need to call independently
+        '''
         
         try:
             self._check_status()
@@ -150,7 +168,13 @@ class CNN_model:
         
 
     def CNN_train(self):
+
+        '''
+        Training CNN
+    
+        '''
         
+        self._get_dependent_variable()
         self._CNN.fit(self._X_train, self._y_train, validation_data=(self._X_val, self._y_val), batch_size=self._CNNparam['batch'], epochs=self._CNNparam['epochs'], verbose=2)
 
     
@@ -163,6 +187,7 @@ class CNN_model:
     def load_CNN(self, model_path):
 
         self._CNN = tf.keras.models.load_model(model_path)  
+        self._get_dependent_variable()
         
     def save_CNN(self, path):
         
@@ -177,6 +202,11 @@ class CNN_model:
         return weight_list
     
     def Evaluation(self, target='test'):
+
+        '''
+        target shoud be 'train', 'validation' or 'test'
+        return auc, acc and classification report
+        '''
         
         prediction = self.predict(target)
 
@@ -197,7 +227,14 @@ class CNN_model:
         return [auc, accuracy, report]
     
     def predict(self, target='test'):
+
+        '''
+        target shoud be 'train', 'validation' or 'test'
+        return prediction
+        '''
         
+        assert target in ['train', 'validation', 'test']
+    
         if target == 'train':
             prediction = self._CNN.predict(self._X_train)
         elif target == 'validation':
@@ -210,21 +247,42 @@ class CNN_model:
         return y_pred
     
     def Separate_Evaluation(self, target='test', **kwargs):
-        
-        if target == 'train':
-            prediction = self.predict(target)
-            Real = self._Y_train
-            
-        elif target == 'validation':
-            prediction = self.predict(target)
-            Real = self._Y_val
-            
-        else:
-            prediction = self.predict(target)
-            Real = self._Y_test
 
+        '''
+        target shoud be 'train', 'validation' or 'test'
+        kwargs should only contain 'year', 'stock' or 'prediction'
+        Return classification report, acc and auc of the stock/year wanted
+        '''
         
-        if len(kwargs.keys()) == 1:
+        assert target in ['train', 'validation', 'test']
+        assert len(kwargs) <= 3
+
+
+        if 'prediction' in kwargs:
+            prediction = kwargs['prediction']
+
+            if target == 'train':
+                Real = self._Y_train
+            elif target == 'validation':
+                Real = self._Y_val
+            else:
+                Real = self._Y_test
+        
+        else:
+            if target == 'train':
+                prediction = self.predict(target)
+                Real = self._Y_train
+                
+            elif target == 'validation':
+                prediction = self.predict(target)
+                Real = self._Y_val
+                
+            else:
+                prediction = self.predict(target)
+                Real = self._Y_test
+
+    
+        if (len(kwargs.keys()) == 1) or ((len(kwargs.keys()) == 2) and ('prediction' in kwargs)):
             if 'year' in kwargs:
                 value = kwargs['year']
                 y_true = [sublist[2] for sublist in Real if sublist[0].year == value]  
@@ -233,7 +291,7 @@ class CNN_model:
                 value = kwargs['stock']
                 y_true = [sublist[2] for sublist in Real if sublist[1] == value]  
                 y_index = [i for i, sublist in enumerate(Real) if sublist[1] == value]
-
+        
         else:
             year = kwargs['year']
             stock = kwargs['stock']
@@ -245,42 +303,75 @@ class CNN_model:
 
                 
         target_names = ['down', 'up']
+
+        fpr, tpr, thresholds = metrics.roc_curve(y_true, y)
+        auc = metrics.auc(fpr, tpr)
         
         report = classification_report(y_true, y, target_names=target_names)
         accuracy = metrics.accuracy_score(y_true, y)
         
+        return report, accuracy, auc
 
-        return report, accuracy
 
-    def Overall_Evaluation(self, target='test', threshold=0.6):
+    def Overall_Evaluation(self, target='test', threshold=0.6, verbose=True):
+
+        '''
+        target shoud be 'train', 'validation' or 'test'
+        threshold is the accuracy/auc score wanted
+        Return the ratio of stocks performe worse than threshold 
+        '''
+
+        assert target in ['train', 'validation', 'test']
+        assert threshold <= 1
+
 
         if target  == 'train':
-            stock = [sublist[1] for sublist in self._Y_train]
+            stock = list(set([sublist[1] for sublist in self._Y_train]))
 
         elif target == 'validation':
-            stock = [sublist[1] for sublist in self._Y_val]
+            stock = list(set([sublist[1] for sublist in self._Y_val]))
 
         else:
-            stock = [sublist[1] for sublist in self._Y_test]
+            stock = list(set([sublist[1] for sublist in self._Y_test]))
 
-        acc = []
+        prediction = self.predict(target)
 
+        acc_list = []
+        auc_list = []
 
-        for s in stock:
-            r, a = self.Separate_Evaluation(target, stock=s)
-            acc.append(a)
+        if verbose:
+            for i, s in enumerate(tqdm(stock)):
+                r, acc, auc = self.Separate_Evaluation(target, stock=s, prediction=prediction)
+                acc_list.append(acc)
+                auc_list.append(auc)
+
+        else:
+            for i, s in enumerate(stock):
+                r, acc, auc = self.Separate_Evaluation(target, stock=s, prediction=prediction)
+                acc_list.append(acc)
+                auc_list.append(auc)
             
 
 
-        rate = len([0 for i in acc if i < threshold])/len(acc)
+        rate_acc = len([0 for i in acc_list if i < threshold])/len(acc_list)
+        rate_auc = len([0 for i in auc_list if i < threshold])/len(auc_list)
 
-        return rate
+        return rate_acc, rate_auc
 
 
 
 class CNN_Tree_Classifier(CNN_model):
 
-    def __init__(self, df, classifier='xgboost', 
+    '''
+    Build CNN > Random Forest/Xgboost Model
+    classifier shoud only be randomforest or xgboost
+    The type of data should be [X_train, Y_train, X_val, Y_val, X_test, Y_test]
+    The type of X should be a (samplesize, timestamp, feature) list
+    The type of Y should be a [[year, stock, label]] list
+    The type of parameter shoud be a dictionary
+    '''
+
+    def __init__(self, df, classifier='randomforest', 
                         CNNparam={'Conv_layer': 3,
                                         'Dense_layer': 1,
                                         'Dense': [128],
@@ -310,7 +401,6 @@ class CNN_Tree_Classifier(CNN_model):
         self._testing_feature = []
 
         
-        
         self.type = classifier.lower()
         
         
@@ -322,7 +412,7 @@ class CNN_Tree_Classifier(CNN_model):
                                                         max_features=self._Classifierparam['max_features'],
                                                         min_samples_leaf=self._Classifierparam['min_samples_leaf'], 
                                                         min_samples_split=self._Classifierparam['min_samples_split'],
-                                                        verbose=1, 
+                                                        verbose=0, 
                                                         n_jobs=-1)
 
         elif classifier.lower() == 'xgboost':
@@ -336,16 +426,28 @@ class CNN_Tree_Classifier(CNN_model):
                                                 eta=self._Classifierparam['eta'],
                                                 #tree_method='gpu_hist',
                                                 gpu_id=0)
+
+        else:
+            raise ValueError('Classifier should be RandomForest or XGBoost')
             
     
 
 
-    def CNN_train(self):
+    def _CNN_train(self):
 
+        '''
+        Not need to call independently
+        '''
+        
+        self._get_dependent_variable()
         self._CNN.fit(self._X_train, self._y_train, validation_data=(self._X_val, self._y_val), batch_size=self._CNNparam['batch'], epochs=self._CNNparam['epochs'], verbose=2)
 
 
-    def Feature_extraction(self):
+    def _Feature_extraction(self):
+
+        '''
+        Not need to call independently
+        '''
 
         intermediate_layer_model = Model(inputs=self._CNN.input, outputs=self._CNN.get_layer('feature').output)
         self._training_feature = intermediate_layer_model.predict(self._X_train)
@@ -370,12 +472,20 @@ class CNN_Tree_Classifier(CNN_model):
         return self._Classifierparam
         
         
-    def Classification(self):
+    def Classifier_train(self):
+
+        '''
+        Training CNN first than extract feature and feed in rf/xgboost
+        '''
+
+        self._CNN_train()
+
+        self._Feature_extraction()
         
         if self.type == 'randomforest':
             self._classifier.fit(self._training_feature, self._lab_train)
         elif self.type == 'xgboost':
-            self._classifier.fit(self._training_feature, self._lab_train, eval_set = [(self._training_feature, self._lab_train), (self._val_feature, self._lab_val)], verbose=True, eval_metric='auc')
+            self._classifier.fit(self._training_feature, self._lab_train, eval_set = [(self._training_feature, self._lab_train), (self._val_feature, self._lab_val)], verbose=False, eval_metric='auc')
 
 
     def save_model(self, path):
@@ -384,6 +494,7 @@ class CNN_Tree_Classifier(CNN_model):
             joblib.dump(self._classifier, fp) 
         
         self._CNN.save(f'{path}CNN.h5')
+
             
     def load_model(self, path):
         
@@ -391,11 +502,19 @@ class CNN_Tree_Classifier(CNN_model):
             self._classifier = joblib.load(fp)
 
         self._CNN = tf.keras.models.load_model(f'{path}CNN.h5')
-        self.Feature_extraction()
+        self._get_dependent_variable()
+        self._Feature_extraction()
 
     
     def predict(self, target='test'):
+
+        '''
+        target shoud be 'train', 'validation' or 'test'
+        return prediction
+        '''
         
+        assert target in ['train', 'validation', 'test']
+
         if target == 'train':
             prediction = self._classifier.predict(self._training_feature)
         elif target == 'validation':
@@ -409,6 +528,14 @@ class CNN_Tree_Classifier(CNN_model):
      
 
 class CNN_Bagging(CNN_model):
+
+    '''
+    Build CNN Bagging Model
+    The type of data should be [X_train, Y_train, X_val, Y_val, X_test, Y_test]
+    The type of X should be a (samplesize, timestamp, feature) list
+    The type of Y should be a [[year, stock, label]] list
+    The type of parameter shoud be a dictionary
+    '''
 
     def __init__(self, df, verbose=1,
                         Param={'n_estimator': 100,
@@ -445,6 +572,11 @@ class CNN_Bagging(CNN_model):
 
     def _Bootstrap(self):
 
+        '''
+        Random Sampling
+        Not need to call independently
+        '''
+
         index = random.sample(range(self._total), self._sample_size)
 
         X_batch = self._X_train[index]
@@ -453,6 +585,12 @@ class CNN_Bagging(CNN_model):
         return X_batch, Y_batch
 
     def CNN_train(self):
+
+        '''
+        Bootstrap first than train CNN on sample
+        '''
+
+        self._get_dependent_variable()
         
         self.model_list = []
 
@@ -498,17 +636,28 @@ class CNN_Bagging(CNN_model):
         model_list = os.listdir(path)
         self.model_list = []
 
-        for model in model_list:
-            m = tf.keras.models.load_model(path)  
+        for i, model in enumerate(tqdm(model_list)):
+            model_name = path + model
+            m = tf.keras.models.load_model(model_name)  
             self.model_list.append(m)
+
+        self._get_dependent_variable()
         
     def save_model(self, path):
         
-        for i, model in enumerate(self.model_list):
+        for i, model in enumerate(tqdm(self.model_list)):
             model.save(f'{path}{i}.h5')
 
 
     def predict(self, target='test'):
+
+        '''
+        Linearly Blending
+        target shoud be 'train', 'validation' or 'test'
+        return prediction  
+        '''
+
+        assert target in ['train', 'validation', 'test']
 
         if target == 'train':
             X = self._X_train
@@ -538,6 +687,14 @@ class CNN_Bagging(CNN_model):
 
 
 class CNN_Boosting(CNN_model):
+
+    '''
+    Build CNN boosting model
+    The type of data should be [X_train, Y_train, X_val, Y_val, X_test, Y_test]
+    The type of X should be a (samplesize, timestamp, feature) list
+    The type of Y should be a [[year, stock, label]] list
+    The type of parameter shoud be a dictionary
+    '''
 
     def __init__(self, df, verbose=1,
                         Param={'n_estimator': 100,
@@ -575,6 +732,10 @@ class CNN_Boosting(CNN_model):
 
     def _Boosting(self):
 
+        '''
+        Random Sampling by sample weight
+        '''
+
         self._weight = self._weight / self._weight.sum(dtype=np.float64)
 
         select_index = np.random.choice(self._total, self._sample_size, p=self._weight, replace=True).tolist()
@@ -586,8 +747,14 @@ class CNN_Boosting(CNN_model):
 
     def _reweight(self):
 
+        '''
+        Reweight sample after each training process base on error rate
+        Return model weighting and sample weighting
+        '''
+
         pred = self._CNN.predict(self._X_train)
         prediction = [item.index(max(item)) for item in pred.tolist()]
+
         error = sum(np.array([self._weight[i] for i in range(self._total) if prediction[i] != self._lab_train[i]]))
         weight =  ((1 - error)/error)**(1/2)
         new_weight = np.array([self._weight[i] * weight if prediction[i] != self._lab_train[i] else self._weight[i] / weight for i in range(self._total)])
@@ -596,6 +763,14 @@ class CNN_Boosting(CNN_model):
 
 
     def CNN_train(self):
+
+        '''
+        Bootstrap based on sample weighting first
+        Train model
+        Than reweight the samples
+        '''
+
+        self._get_dependent_variable()
         
         self.model_list = []
         self._vote_weight = []
@@ -605,6 +780,7 @@ class CNN_Boosting(CNN_model):
                 X, Y = self._Boosting()
             else:
                 X, Y = self._X_train, self._y_train
+
             self._CNN = Sequential()
             self._CNN.add(Conv1D(
                 filters=self._CNNparam['filter'][0], 
@@ -644,20 +820,33 @@ class CNN_Boosting(CNN_model):
 
     def load_model(self, model_path, weight_path):
 
+        '''
+        Load both model weight and model
+        '''
+
         model_list = os.listdir(model_path)
         self.model_list = []
 
-        for model in model_list:
-            m = tf.keras.models.load_model(model_path)  
+        for i, model in enumerate(tqdm(model_list)):
+            if model[-2:] != 'h5':
+                continue
+            model_name = model_path + model
+            m = tf.keras.models.load_model(model_name)  
             self.model_list.append(m)
 
         with open(weight_path, 'rb') as fp:
             self._vote_weight = pickle.load(fp)
-        
+
+        self._get_dependent_variable()
+
         
     def save_model(self, model_path, weight_path):
+
+        '''
+        Save both model weight and model
+        '''
         
-        for i, model in enumerate(self.model_list):
+        for i, model in enumerate(tqdm(self.model_list)):
             model.save(f'{model_path}{i}.h5')
         
         with open(weight_path, 'wb') as fp:
@@ -665,6 +854,14 @@ class CNN_Boosting(CNN_model):
 
 
     def predict(self, target='test'):
+
+        '''
+        Voting based on model weight
+        target shoud be 'train', 'validation' or 'test'
+        return prediction
+        '''
+
+        assert target in ['train', 'validation', 'test']
 
         if target == 'train':
             X = self._X_train
