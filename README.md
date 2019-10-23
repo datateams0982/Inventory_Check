@@ -7,25 +7,23 @@
 ## Data Preprocess
 
 * Read and join csv
-* Aggregate data
-* Extract OHLCV
+* Filter out non-trading stocks
+* Combine with capital reduction data
 * Filling missing timestamps
 
 ## Clustering
 
-* Denoising stock prices by wavelet
-* Build Correlation Matrix
+* Compute time weighted mean of true range, capital and total as feature of clustering
+* log normalization, separate to two class by total
 * Clustering
 * Select cluster and split data
 
 ## Feature Engineering
 
-* Time Feature: Intramonth, week-day, weekly, monthly
+* Remove Reduction data and separate data.
 * Denoised OHLCV
 * Technical Indicators calculated by denoised OHLCV
 * Cluster Index
-* Return
-* Dependent Variable
 
 
 ## Training Preparation
@@ -37,7 +35,7 @@
 
 ## Model 
 
-* Model
+* Model: CNN_tree, CNN_bagging, CNN_boosting
 * Hyperparameter Tuning
 * Evaluation
 * Result Printing
