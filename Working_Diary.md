@@ -51,4 +51,7 @@
 * Solving memory problem for CNN-XGBoost (two script, slow, use random forest only?)
 * Debug
 
+# 2019/10/23
 
+* Design automated hyperparameter tuning (finished)
+* Building classes for clustering, feature engineering, training preparation
