@@ -145,7 +145,7 @@ class Hyperparameter_Tuning:
         
     # Sort with best score on top
         self.results.sort_values('acc', ascending = False, inplace = True)
-        self.results.reset_index(inplace = True)
+        self.results.reset_index(drop=True)
         for i in range(self._num):
             self.optimal_CNN[i] = self.results.iloc[i]['CNN_params']
             self.optimal_model[i] = self.results.iloc[i]['Model_params']
@@ -240,7 +240,7 @@ class Hyperparameter_Tuning:
                 self.optimal[i-1] = CNN_Bagging(self._df)
                 path = f'{self._path}optimal_{i}\\'
                 self.optimal[i-1].load_model(path)
-                
+
         else:
             for i in range(1, self._num+1):
                 self.optimal[i-1] = CNN_Boosting(self._df)
