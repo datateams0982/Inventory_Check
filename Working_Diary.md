@@ -55,3 +55,7 @@
 
 * Design automated hyperparameter tuning (finished)
 * Building classes for clustering, feature engineering, training preparation
+
+# 2019/10/24
+
+* P
