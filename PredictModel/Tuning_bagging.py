@@ -20,7 +20,7 @@ def main():
                 'padding': ['causal'],
                 'learning_rate': [0.001, 0.002, 0.003],
                 'batch': [64, 128, 256, 512],
-                'epochs': [30, 40, 50, 70, 80]}
+                'epochs': [30, 40, 50, 60]}
     model_param = {'n_estimator': [5, 10],
                     'subsample': [0.75, 0.8, 0.85, 0.9]}
 
