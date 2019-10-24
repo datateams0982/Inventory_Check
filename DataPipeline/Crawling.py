@@ -11,7 +11,7 @@ import random
 
 class TWSE_Crawler:
 
-    def __init__(f=1):
+    def __init__(self, f=1):
         f 
 
 

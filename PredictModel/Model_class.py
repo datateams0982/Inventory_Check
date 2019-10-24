@@ -493,7 +493,7 @@ class CNN_Tree_Classifier(CNN_model):
         
         if self.type == 'randomforest':
             self._classifier = RandomForestClassifier(n_estimators=self._Classifierparam['n_estimators'], 
-                                                        max_depth=self._Classifierparam['n_estimators'],
+                                                        max_depth=self._Classifierparam['max_depth'],
                                                         max_features=self._Classifierparam['max_features'],
                                                         min_samples_leaf=self._Classifierparam['min_samples_leaf'], 
                                                         min_samples_split=self._Classifierparam['min_samples_split'],
@@ -505,7 +505,7 @@ class CNN_Tree_Classifier(CNN_model):
             self._classifier = XGBClassifier(colsample_bytree=self._Classifierparam['colsample_bytree'],
                                                 subsample=self._Classifierparam['subsample'],
                                                 n_estimators=self._Classifierparam['n_estimators'], 
-                                                max_depth=self._Classifierparam['n_estimators'], 
+                                                max_depth=self._Classifierparam['max_depth'], 
                                                 gamma=self._Classifierparam['gamma'],
                                                 eta=self._Classifierparam['eta'],
                                                 #tree_method='gpu_hist',

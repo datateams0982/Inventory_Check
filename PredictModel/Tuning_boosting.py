@@ -4,7 +4,7 @@ from tqdm import tqdm_notebook as tqdm
 
 from Model_class import CNN_model, CNN_Tree_Classifier, CNN_Bagging, CNN_Boosting
 from Fine_Tune import Hyperparameter_Tuning as Tuning
-
+import time
 import pickle
 import random
 
@@ -20,13 +20,20 @@ def main():
                 'learning_rate': [0.001, 0.002, 0.003],
                 'batch': [64, 128, 256, 512],
                 'epochs': [30, 40, 50, 70, 80]}
-    model_param = {'n_estimator': [25, 50, 75, 100, 125],
+    model_param = {'n_estimator': [5, 10],
                     'subsample': [0.75, 0.8, 0.85, 0.9]}
 
-    Optimization = Tuning(df_path=path, model='CNN_Boosting', CNNparam=CNN_param, Modelparam=rf_param, max_iter=1000, cluster_num=0, model_keep=3)
+    Start = time.time()
+    Optimization = Tuning(df_path=path, model='CNN_Boosting', CNNparam=CNN_param, Modelparam=model_param, max_iter=15, cluster_num=0)
     Optimization.RandomSearch()
-    Optimization.save_optimal_model()
-    Optimization.save_optimal_param()
+
+    end = time.time()
+
+    total = end - Start
+
+    with open('D:\\庫存健診開發\\CNN_Boosting.txt', 'wb') as fp:
+        fp.write(total)
+
 
 
 if __name__ == "__main__":

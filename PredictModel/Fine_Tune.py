@@ -25,15 +25,11 @@ class Hyperparameter_Tuning:
 
     '''
 
-    def __init__(self, df_path, model, CNNparam, Modelparam, max_iter, cluster_num, model_keep=3):
+    def __init__(self, df_path, model, CNNparam, Modelparam, max_iter, cluster_num):
         
 
         assert type(max_iter) is int
         assert type(cluster_num) is int
-        assert type(model_keep) is int
-
-        if max_iter < model_keep:
-            raise ValueError('Iteration should be larger than model kept')
 
 
         with open(f'{df_path}Cluster_{cluster_num}_classification_minmax0_Weekly', 'rb') as fp:
@@ -45,15 +41,11 @@ class Hyperparameter_Tuning:
 
         self._iter = max_iter
         self._cluster = cluster_num
-        self._num = model_keep
-        self._optimal_acc = [i for i in range(model_keep)]
-        self.optimal = [i for i in range(model_keep)]
-        self.optimal_CNN = [i for i in range(model_keep)]
-        self.optimal_model = [i for i in range(model_keep)]
+        self.optimal = []
 
 
-        for i in range(1, model_keep+1):
-            directory = f'D:\\庫存健診開發\\model\\cluster{cluster_num}\\{model}\\optimal_{i}'
+        for i in range(1, max_iter+1):
+            directory = f'D:\\庫存健診開發\\model\\cluster{cluster_num}\\{model}\\model_{i}'
             if not os.path.exists(directory):
                 os.makedirs(directory)
 
@@ -73,7 +65,7 @@ class Hyperparameter_Tuning:
         return self._iter
 
 
-    def _Objective(self, verbose):
+    def _Objective(self, verbose, iteration):
 
         '''
         The objective function (acc) to optimize in random search
@@ -81,34 +73,29 @@ class Hyperparameter_Tuning:
         '''
 
         if 'tree' in self._model:
-            classifier = CNN_Tree_Classifier(self._df, classifier=self.model_hyperparameters['classifier'], xgbc_param=self.model_hyperparameters, rf_param=self.model_hyperparameters, CNNparam=self.CNN_hyperparameters)
-            classifier.Classifier_train()
+            self.classifier = CNN_Tree_Classifier(self._df, classifier=self.model_hyperparameters['classifier'], xgbc_param=self.model_hyperparameters, rf_param=self.model_hyperparameters, CNNparam=self.CNN_hyperparameters)
+            self.classifier.Classifier_train()
 
         elif 'bagging' in self._model:
-            classifier = CNN_Bagging(self._df, Param=self.model_hyperparameters, CNNparam=self.CNN_hyperparameters)
-            classifier.CNN_train()
+            self.classifier = CNN_Bagging(self._df, Param=self.model_hyperparameters, CNNparam=self.CNN_hyperparameters)
+            self.classifier.CNN_train()
 
         else:
-            classifier = CNN_Boosting(self._df, Param=self.model_hyperparameters, CNNparam=self.CNN_hyperparameters)
-            classifier.CNN_train()
+            self.classifier = CNN_Boosting(self._df, Param=self.model_hyperparameters, CNNparam=self.CNN_hyperparameters)
+            self.classifier.CNN_train()
 
 
-        auc, acc, report = classifier.Evaluation(target='validation')
-        balance_acc, balance_auc = classifier.Overall_Evaluation(target='validation', verbose=False)
+        auc, acc, report = self.classifier.Evaluation(target='validation')
+        balance_acc, balance_auc = self.classifier.Overall_Evaluation(target='validation', verbose=False)
 
-        for i in range(len(self._optimal_acc)):
-            if acc > self._optimal_acc[i]:
-                self._optimal_acc.insert(i, acc)
-                self.optimal.insert(i, classifier)
-                self._optimal_acc, self.optimal = self._optimal_acc[:self._num], self.optimal[:self._num]
-                break
-            else:
-                continue
+        self.save_model(iteration=iteration)
+
+        
 
         if verbose:
             print("AUC:\t{0} \t Accuracy:\t{1} \t Accuracy Balance:\t{2} \t AUC Balance:\t{3}".format(auc, acc, balance_acc, balance_auc))
 
-        return [auc, acc, balance_acc, balance_auc, self.CNN_hyperparameters, self.model_hyperparameters]
+        return [iteration+1, auc, acc, balance_acc, balance_auc, self.CNN_hyperparameters, self.model_hyperparameters]
 
 
     def RandomSearch(self, verbose=True):
@@ -118,8 +105,7 @@ class Hyperparameter_Tuning:
         Return Result data frame sort by accuracy score
         '''
 
-    
-        self.results = pd.DataFrame(columns = ['auc', 'acc', 'balance_acc', 'balance_auc', 'CNN_params', 'Model_params'], index = list(range(self._iter)))
+        self.results = pd.DataFrame(columns = ['iteration', 'auc', 'acc', 'balance_acc', 'balance_auc', 'CNN_params', 'Model_params'], index = list(range(self._iter)))
 
         
         # Keep searching until reach max evaluations
@@ -142,7 +128,7 @@ class Hyperparameter_Tuning:
             self.model_hyperparameters = {k: random.sample(v, 1)[0] for k, v in self._Modelparam.items()}
 
             # Evaluate randomly selected hyperparameters
-            eval_results = self._Objective(verbose=verbose)
+            eval_results = self._Objective(verbose=verbose, iteration=i)
 
             self.results.loc[i, :] = eval_results
             
@@ -150,9 +136,7 @@ class Hyperparameter_Tuning:
     # Sort with best score on top
         self.results.sort_values('acc', ascending = False, inplace = True)
         self.results.reset_index(drop=True)
-        for i in range(self._num):
-            self.optimal_CNN[i] = self.results.iloc[i]['CNN_params']
-            self.optimal_model[i] = self.results.iloc[i]['Model_params']
+        self.results.to_csv(f'D:\\庫存健診開發\\data\\Tuning_Result\\{self._model}.csv', index=False)
     
     
 
@@ -204,31 +188,27 @@ class Hyperparameter_Tuning:
     #     return [auc, acc, report, balance, prediction]
 
 
-    def save_optimal_model(self):
+    def save_model(self, iteration):
 
         '''
         Save optimal models
         '''
-        self.results.to_csv(f'D:\\庫存健診開發\\data\\Tuning_Result\\{self._model}.csv', index=False)
-
+        
         if 'tree' in self._model:
-            for i in tqdm(range(len(self.optimal))):
-                path = f'{self._path}optimal_{i+1}\\'
-                self.optimal[i].save_model(path)
+            path = f'{self._path}model_{iteration+1}\\'
+            self.classifier.save_model(path)
 
         elif 'bagging' in self._model:
-             for i in tqdm(range(len(self.optimal))):
-                path = f'{self._path}optimal_{i+1}\\CNN_'
-                self.optimal[i].save_model(path)
+            path = f'{self._path}model_{iteration+1}\\CNN_'
+            self.classifier.save_model(path)
 
         else:
-             for i in tqdm(range(len(self.optimal))):
-                model_path = f'{self._path}optimal_{i+1}\\CNN_'
-                weight_path = f'{self._path}optimal_{i+1}\\weighting'
-                self.optimal[i].save_model(model_path, weight_path)
+            model_path = f'{self._path}model_{iteration+1}\\CNN_'
+            weight_path = f'{self._path}model_{iteration+1}\\weighting'
+            self.classifier.save_model(model_path, weight_path)
 
 
-    def load_optimal_model(self):
+    def load_optimal_model(self, iteration):
 
         '''
         load all optimal models
@@ -236,26 +216,23 @@ class Hyperparameter_Tuning:
         self.results = pd.read_csv(f'D:\\庫存健診開發\\data\\Tuning_Result\\{self._model}.csv')
 
         if 'tree' in self._model:
-            for i in range(1, self._num+1):
-                self.optimal[i-1] = CNN_Tree_Classifier(self._df)
-                path = f'{self._path}optimal_{i}\\'
-                self.optimal[i-1].load_model(path)
+            self.optimal = CNN_Tree_Classifier(self._df)
+            path = f'{self._path}model_{iteration}\\'
+            self.optimal.load_model(path)
 
         elif 'bagging' in self._model:
-            for i in range(1, self._num+1):
-                self.optimal[i-1] = CNN_Bagging(self._df)
-                path = f'{self._path}optimal_{i}\\'
-                self.optimal[i-1].load_model(path)
+            self.optimal = CNN_Bagging(self._df)
+            path = f'{self._path}model_{iteration}\\'
+            self.optimal.load_model(path)
 
         else:
-            for i in range(1, self._num+1):
-                self.optimal[i-1] = CNN_Boosting(self._df)
-                model_path = f'{self._path}optimal_{i}\\'
-                weight_path = f'{self._path}optimal_{i}\\weighting'
-                self.optimal[i-1].load_model(model_path, weight_path)
+            self.optimal = CNN_Boosting(self._df)
+            model_path = f'{self._path}model_{iteration}\\'
+            weight_path = f'{self._path}model_{iteration}\\weighting'
+            self.optimal.load_model(model_path, weight_path)
 
 
-    def predict(self, i, target='test'):
+    def predict(self, target='test'):
 
         '''
         i is the numbering of optimal model wanted (int)
@@ -264,16 +241,13 @@ class Hyperparameter_Tuning:
         '''
 
         assert target in ['train', 'validation', 'test']
-        assert type(i) is int
-        if i > self._num:
-            raise ValueError(f'Only {self._num} models kept')
-
-        prediction = self.optimal[i-1].predict(target)
+        
+        prediction = self.optimal.predict(target)
 
         return prediction
 
 
-    def Evaluation(self, i, target='test'):
+    def Evaluation(self, target='test'):
 
         '''
         i is the numbering of optimal model wanted (int)
@@ -282,16 +256,13 @@ class Hyperparameter_Tuning:
         '''
 
         assert target in ['train', 'validation', 'test']
-        assert type(i) is int
-        if i > self._num:
-            raise ValueError(f'Only {self._num} models kept')
+        
 
-
-        score = self.optimal[i-1].Evaluation(target)
+        score = self.optimal.Evaluation(target)
 
         return score
 
-    def Separate_Evaluation(self, i, target='test', **kwargs):
+    def Separate_Evaluation(self, target='test', **kwargs):
 
         '''
         i is the numbering of optimal model wanted (int)
@@ -300,17 +271,14 @@ class Hyperparameter_Tuning:
         '''
 
         assert target in ['train', 'validation', 'test']
-        assert type(i) is int
-        if i > self._num:
-            raise ValueError(f'Only {self._num} models kept')
+        
 
-
-        report, acc = self.optimal[i-1].Separate_Evaluation(target, kwargs)
+        report, acc = self.optimal.Separate_Evaluation(target, kwargs)
 
         return report, acc
 
 
-    def Overall_Evaluation(self, i, target='test', verbose=True, threshold=0.6):
+    def Overall_Evaluation(self, target='test', verbose=True, threshold=0.6):
 
         '''
         i is the numbering of optimal model wanted (int)
@@ -321,12 +289,9 @@ class Hyperparameter_Tuning:
 
         assert target in ['train', 'validation', 'test']
         assert threshold <= 1
-        assert type(i) is int
-        if i > self._num:
-            raise ValueError(f'Only {self._num} models kept')
+        
 
-
-        balance_acc, balance_auc = self.optimal[i-1].Overall_Evaluation(target, verbose=verbose, threshold=threshold)
+        balance_acc, balance_auc = self.optimal.Overall_Evaluation(target, verbose=verbose, threshold=threshold)
 
         return balance_acc, balance_auc
 
