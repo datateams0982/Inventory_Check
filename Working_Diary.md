@@ -59,3 +59,9 @@
 # 2019/10/24
 
 * Parameter Tuning
+
+# 2019/10/25
+
+* Parameter Tuning
+* First version of model complete
+* Better tuning method?
