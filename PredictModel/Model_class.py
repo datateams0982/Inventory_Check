@@ -25,7 +25,7 @@ from tensorflow.keras import layers, optimizers
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.regularizers import l2
 
-from xgboost import XGBClassifier, plot_importance
+#from xgboost import XGBClassifier, plot_importance
 
 import pickle
 import sys
