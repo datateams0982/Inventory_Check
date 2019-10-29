@@ -49,6 +49,10 @@ class Hyperparameter_Tuning:
             if not os.path.exists(directory):
                 os.makedirs(directory)
 
+        directory = f'D:\\庫存健診開發\\data\\Tuning_Result\\cluster_{self._cluster}\\'
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
         self._path = f'D:\\庫存健診開發\\model\\cluster{cluster_num}\\{model}\\'
 
 
@@ -85,17 +89,21 @@ class Hyperparameter_Tuning:
             self.classifier.CNN_train()
 
 
-        auc, acc, report = self.classifier.Evaluation(target='validation')
-        balance_acc, balance_auc = self.classifier.Overall_Evaluation(target='validation', verbose=False)
+        auc_val, acc_val, report_val = self.classifier.Evaluation(target='validation')
+        auc_test, acc_test, report_test = self.classifier.Evaluation(target='test')
+        auc_train, acc_train, report_train = self.classifier.Evaluation(target='train')
+        balance_acc_val, balance_auc_val = self.classifier.Overall_Evaluation(target='validation', verbose=False)
+        balance_acc_test, balance_auc_test = self.classifier.Overall_Evaluation(target='test', verbose=False)
+        balance_acc_train, balance_auc_train = self.classifier.Overall_Evaluation(target='train', verbose=False)
 
         self.save_model(iteration=iteration)
 
         
 
         if verbose:
-            print("AUC:\t{0} \t Accuracy:\t{1} \t Accuracy Balance:\t{2} \t AUC Balance:\t{3}".format(auc, acc, balance_acc, balance_auc))
+            print("AUC:\t{0} \t Accuracy:\t{1} \t Accuracy Balance:\t{2} \t AUC Balance:\t{3}".format(auc_val, acc_val, balance_acc_val, balance_auc_val))
 
-        return [iteration+1, auc, acc, balance_acc, balance_auc, self.CNN_hyperparameters, self.model_hyperparameters]
+        return [iteration+1, auc_val, acc_val, auc_test, acc_test, auc_train, acc_train, balance_acc_val, balance_auc_val, balance_acc_test, balance_auc_test, balance_acc_train, balance_auc_train, self.CNN_hyperparameters, self.model_hyperparameters]
 
 
     def RandomSearch(self, verbose=True):
@@ -105,7 +113,7 @@ class Hyperparameter_Tuning:
         Return Result data frame sort by accuracy score
         '''
 
-        self.results = pd.DataFrame(columns = ['iteration', 'auc', 'acc', 'balance_acc', 'balance_auc', 'CNN_params', 'Model_params'], index = list(range(self._iter)))
+        self.results = pd.DataFrame(columns = ['iteration', 'auc_val', 'acc_val', 'auc_test', 'acc_test', 'auc_train', 'acc_train', 'balance_acc_val', 'balance_auc_val', 'balance_acc_test', 'balance_auc_test', 'balance_acc_train', 'balance_auc_train', 'CNN_params', 'Model_params'], index = list(range(self._iter)))
 
         
         # Keep searching until reach max evaluations
@@ -136,7 +144,7 @@ class Hyperparameter_Tuning:
     # Sort with best score on top
         self.results.sort_values('acc', ascending = False, inplace = True)
         self.results.reset_index(drop=True)
-        self.results.to_csv(f'D:\\庫存健診開發\\data\\Tuning_Result\\{self._model}.csv', index=False)
+        self.results.to_csv(f'D:\\庫存健診開發\\data\\Tuning_Result\\cluster_{self._cluster}\\{self._model}.csv', index=False)
     
     
 

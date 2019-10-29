@@ -25,7 +25,7 @@ def main():
                     'subsample': [0.75, 0.8, 0.85, 0.9]}
 
     Start = time.time()
-    Optimization = Tuning(df_path=path, model='CNN_Bagging', CNNparam=CNN_param, Modelparam=model_param, max_iter=15, cluster_num=0)
+    Optimization = Tuning(df_path=path, model='CNN_Bagging', CNNparam=CNN_param, Modelparam=model_param, max_iter=15, cluster_num=1)
     Optimization.RandomSearch()
 
     end = time.time()
@@ -33,7 +33,7 @@ def main():
     total = end - Start
 
     with open('D:\\庫存健診開發\\CNN_Bagging.txt', 'wb') as fp:
-        fp.write(total)
+        fp.write(f'CNN_Bagging takes {total} time')
 
 
 

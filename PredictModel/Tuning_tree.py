@@ -30,14 +30,14 @@ def main():
                 'n_estimators': [50, 75, 100, 125, 150]}
 
     start = time.time()
-    Optimization = Tuning(df_path=path, model='CNN_Tree_Classifier', CNNparam=CNN_param, Modelparam=rf_param, max_iter=30, cluster_num=0)
+    Optimization = Tuning(df_path=path, model='CNN_Tree_Classifier', CNNparam=CNN_param, Modelparam=rf_param, max_iter=30, cluster_num=1)
     Optimization.RandomSearch()
     end = time.time()
 
     total = end - start
 
     with open('D:\\庫存健診開發\\CNN_tree_tuning_time.txt', 'wb') as fp:
-        fp.write(total)
+        fp.write(f'CNN_tree takes {total} time')
 
 
 
