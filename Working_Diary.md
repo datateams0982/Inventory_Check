@@ -68,5 +68,5 @@
 
 # 2019/10/30
 
-* add iventory data/feature
+* add inventory data/feature
 * try adanet
