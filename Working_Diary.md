@@ -65,3 +65,8 @@
 * Parameter Tuning
 * First version of model complete
 * Better tuning method?
+
+# 2019/10/30
+
+* add iventory data/feature
+* try adanet
