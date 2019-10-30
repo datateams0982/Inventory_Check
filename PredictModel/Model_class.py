@@ -236,7 +236,7 @@ class CNN_model:
         else:
             prediction = self._CNN.predict(self._X_test)
             
-        y_pred = [item.index(max(item)) for item in prediction.tolist()]
+        y_pred = np.array([item.index(max(item)) for item in prediction.tolist()])
             
         return y_pred
 
@@ -447,7 +447,7 @@ class CNN_Tree_Classifier(CNN_model):
         self._CNN.add(Dense(2, activation='softmax'))
 
         self._opt = optimizers.Nadam(lr=self._CNNparam['learning_rate'])
-        self._CNN.compile(loss='categorical_crossentropy', optimizer=self._opt, metrics=[tf.keras.metrics.AUC()])
+        self._CNN.compile(loss='categorical_crossentropy', optimizer=self._opt, metrics=['accuracy'])
         self._get_dependent_variable()
         self._CNN.fit(self._X_train, self._y_train, validation_data=(self._X_val, self._y_val), batch_size=self._CNNparam['batch'], epochs=self._CNNparam['epochs'], verbose=2)
 
@@ -639,7 +639,7 @@ class CNN_Bagging(CNN_model):
             self._CNN.add(Dense(2, activation='softmax'))
 
             self._opt = optimizers.Nadam(lr=self._CNNparam['learning_rate'])
-            self._CNN.compile(loss='categorical_crossentropy', optimizer=self._opt, metrics=[tf.keras.metrics.AUC()])
+            self._CNN.compile(loss='categorical_crossentropy', optimizer=self._opt, metrics=['accuracy'])
 
             self._CNN.fit(X, Y, validation_data=(self._X_val, self._y_val), batch_size=self._CNNparam['batch'], epochs=self._CNNparam['epochs'], verbose=2)
             

@@ -233,8 +233,10 @@ def get_technical_indicators(data, SplitDate=date(2017,9,1), denoise=True):
     dataset['lower_band'] = dataset['ma21'] - (dataset['20sd']*2)
 
     #Compute skewness and kurtosis
-    dataset['skew'] = dataset['close'].rolling(window=20).apply(lambda x: skew(x))
-    dataset['kurtosis'] = dataset['close'].rolling(window=20).apply(lambda x: kurtosis(x))
+    skew_feature = ['close', 'foreign_buy', 'investment_buy', 'dealer_buy']
+    for feature in skew_feature:
+        dataset[f'{feature}_skew'] = dataset[feature].rolling(window=20).apply(lambda x: skew(x))
+        dataset[f'{feature}_kurtosis'] = dataset[feature].rolling(window=20).apply(lambda x: kurtosis(x))
 
     #Compute PVT
     dataset['pvt_current'] = dataset.apply(price_volume_trend, axis=1)

@@ -47,3 +47,16 @@ def read_increase(filename, file_path):
     d['increase_date'] = d['increase_date'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
     
     return d
+
+
+def read_inventory(filename, file_path):
+    with open(f'{file_path}{filename}', 'r', encoding="ansi") as fp, \
+        open(f'{file_path}{filename[:8]}.csv', 'wb') as fw:
+        for line in fp.readlines():
+            fw.write(line.encode('utf-8'))
+
+    df = pd.read_csv(f'{file_path}{filename[:8]}.csv', converters={'股票代號': str})
+    d = df[['日期', '股票代號', '外資買賣超', '投信買賣超', '自營商買賣超']].rename(columns={'日期': 'ts', '股票代號': 'StockNo', '外資買賣超': 'foreign_buy', '投信買賣超': 'investment_buy', '自營商買賣超': 'dealer_buy'})
+    d['ts'] = d['ts'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
+    
+    return d
