@@ -70,3 +70,8 @@
 
 * add inventory data/feature
 * try adanet
+
+# 2019/10/31
+
+* Adanet
+* Model complexity evaluation, the way to iterate the model
