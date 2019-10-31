@@ -574,7 +574,7 @@ class CNN_Bagging(CNN_model):
                                     'padding': ['causal', 'causal', 'causal'],
                                     'learning_rate': 0.001,
                                     'batch': 256,
-                                    'epochs': 80}):
+                                    'epochs': 30}):
 
         super(CNN_Bagging, self).__init__(df, CNNparam)
 

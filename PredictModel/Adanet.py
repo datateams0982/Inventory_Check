@@ -9,12 +9,9 @@ import os
 from sklearn import metrics
 from sklearn.metrics import classification_report
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.externals import joblib
 import pickle
 import sys
 import tensorflow as tf
-from tensorflow.keras.layers import Dense, Input, LSTM, Embedding, Dropout, Activation, Flatten, TimeDistributed, LeakyReLU, Conv1D, BatchNormalization, MaxPooling1D, AveragePooling1D
 import adanet
 
 
@@ -102,28 +99,28 @@ class Input_generator:
 
         self._get_dependent_variable()
 
-        train_input_fn = tf.estimator.inputs.numpy_input_fn(
+        train_input_fn = tf.compat.v1.estimator.inputs.numpy_input_fn(
                             x={"x": self._X_train},
                             y=self._lab_train.reshape(-1,1),
                             batch_size=batch_size,
                             num_epochs=epochs,
                             shuffle=False)
 
-        adanet_input_fn = tf.estimator.inputs.numpy_input_fn(
+        adanet_input_fn = tf.compat.v1.estimator.inputs.numpy_input_fn(
                             x={"x": self._X_train},
                             y=self._lab_train.reshape(-1,1),
                             batch_size=batch_size,
                             num_epochs=1,
                             shuffle=False)
 
-        val_input_fn = tf.estimator.inputs.numpy_input_fn(
+        val_input_fn = tf.compat.v1.estimator.inputs.numpy_input_fn(
                             x={"x": self._X_val},
                             y=self._lab_val.reshape(-1,1),
                             batch_size=batch_size,
                             num_epochs=1,
                             shuffle=False)
 
-        test_input_fn = tf.estimator.inputs.numpy_input_fn(
+        test_input_fn = tf.compat.v1.estimator.inputs.numpy_input_fn(
                             x={"x": self._X_test},
                             y=self._lab_test.reshape(-1,1),
                             batch_size=batch_size,
@@ -136,10 +133,15 @@ class Input_generator:
 
 class CNNBuilder(adanet.subnetwork.Builder):
 
-    def __init__(self, CNNparam):
+    def __init__(self, conv_layer, dense_layer, conv_neuron, dense_neuron, dropout, learning_rate):
 
         
-        self._CNNparam = CNNparam
+        self._conv_layer = conv_layer
+        self._dense_layer = dense_layer
+        self._conv_neuron = conv_neuron
+        self._dense_neuron = dense_neuron
+        self._drop_out = dropout
+        self._learning_rate = learning_rate
 
     def build_subnetwork(self,
                         features,
@@ -149,35 +151,39 @@ class CNNBuilder(adanet.subnetwork.Builder):
                         summary,
                         previous_ensemble=None):
         
-        timestep = list(features.values())[0]
+        x = list(features.values())[0]
 
-        x = timestep
-
-        x = Conv1D(filters=self._CNNparam['filter'][0], 
-                            kernel_size=self._CNNparam['kernel'][0], 
-                            activation='relu',  
-                            padding=self._CNNparam['padding'][0])(x)
+        x = tf.layers.conv1d(x, filters=self._conv_neuron[0], 
+                            kernel_size=3, 
+                            activation=tf.nn.relu,  
+                            padding='causal')
     
-        for i in range(self._CNNparam['Conv_layer'] - 1):
-            x = Conv1D(filters=self._CNNparam['filter'][i+1], 
-                        kernel_size=self._CNNparam['kernel'][i+1], 
-                        activation='relu',
-                        padding=self._CNNparam['padding'][i+1])(x)
+        for i in range(self._conv_layer - 1):
+            x = tf.layers.conv1d(x, filters=self._conv_neuron[i+1], 
+                                kernel_size=3, 
+                                activation=tf.nn.relu,  
+                                padding='causal')
 
-            x = Dropout(self._CNNparam['dropout_ratio'][i])(x)
+            x = tf.layers.dropout(x, rate=self._drop_out[i])
             
-        x = Flatten()(x)
+        x = tf.layers.flatten(x)
 
-        for i in range(self._CNNparam['Dense_layer'] - 1):
-            x = Dense(self._CNNparam['Dense'][i])(x)
-            x = Dropout(self._CNNparam['dropout_ratio'][i+self._CNNparam['Conv_layer'] - 1])(x)
+        for i in range(self._dense_layer - 1):
+            x = tf.layers.dense(x, units=self._dense_neuron[i], activation=tf.nn.relu)
+            x = tf.layers.dropout(x, self._drop_out[i+self._conv_layer - 1])
         
-        logits = Dense(1, activation=None)(x)
+        logits = tf.layers.dense(x, units=1, activation=None)
 
 
-        complexity = tf.sqrt(tf.cast(self._CNNparam['Conv_layer'] + self._CNNparam['Dense_layer'], dtype=tf.float32))
+        complexity = tf.sqrt(tf.cast(self._conv_layer + self._dense_layer, dtype=tf.float32)) + tf.sqrt(tf.cast(sum(self._conv_neuron) + sum(self._dense_neuron), dtype=tf.float32))/10 - tf.sqrt(tf.cast(sum(self._drop_out), dtype=tf.float32))
 
-        shared = {'num_layers': self._CNNparam['Conv_layer'] + self._CNNparam['Dense_layer']}
+        shared = {'conv_layer': self._conv_layer, 
+                    'dense_layer': self._dense_layer, 
+                    'conv_neuron': self._conv_neuron, 
+                    'dense_neuron': self._dense_neuron, 
+                    'dropout': self._drop_out,
+                    'learning_rate': self._learning_rate}
+
         
         return adanet.Subnetwork(
             last_layer=x,
@@ -195,7 +201,8 @@ class CNNBuilder(adanet.subnetwork.Builder):
                                   summary,
                                   previous_ensemble=None):
 
-        optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
+
+        optimizer = tf.train.AdamOptimizer(learning_rate=self._learning_rate)
 
         return optimizer.minimize(loss=loss, var_list=var_list)
 
@@ -213,30 +220,15 @@ class CNNBuilder(adanet.subnetwork.Builder):
     @property
     def name(self):
         """See `adanet.subnetwork.Builder`."""
-
-        return 'CNN'
-
-
-
+        return f'CNN_{self._conv_layer}_{self._conv_neuron[0]}_{self._dense_layer}_{self._dense_neuron[0]}_{self._learning_rate}'
+        
 
 
 class CNNGenerator(adanet.subnetwork.Generator):
 
-    def __init__(self ,CNNparam):
+    def __init__(self):
 
-
-        conv_layer = random.sample(CNNparam['Conv_layer'], 1)[0]
-        dense_layer = random.sample(CNNparam['Dense_layer'], 1)[0]
-        CNN_hyperparam = {'Conv_layer': conv_layer,
-                    'Dense_layer': dense_layer,
-                    'Dense': random.choices(CNNparam['Dense'], k=dense_layer),
-                    'dropout_ratio': random.choices(CNNparam['dropout_ratio'], k=conv_layer + dense_layer),
-                    'filter': random.choices(CNNparam['filter'], k=conv_layer),
-                    'kernel': random.choices(CNNparam['kernel'], k=conv_layer),
-                    'padding': random.choices(CNNparam['padding'], k=conv_layer),
-                    'learning_rate': random.choices(CNNparam['learning_rate'], k=1)[0]}
-
-        self._cnn_builder_fn = CNNBuilder(CNN_hyperparam)
+        self._cnn_builder_fn = CNNBuilder
 
 
     def generate_candidates(self,
@@ -245,36 +237,108 @@ class CNNGenerator(adanet.subnetwork.Generator):
                                 previous_ensemble_reports,
                                 all_reports):
 
-        return [self._cnn_builder_fn]
+        conv_layer = 1
+        dense_layer = 1
+        dense_neuron = [64, 32]    
+        dropout = [0.3, 0.3, 0.3, 0.3]
+        conv_neuron = [32, 64, 64, 128]
+        learning_rate = 0.001
+
+
+
+        if previous_ensemble:
+            conv_layer = tf.contrib.util.constant_value(
+                previous_ensemble.weighted_subnetworks[-1]
+                .subnetwork
+                .shared['conv_layer'])
+
+            dense_layer = tf.contrib.util.constant_value(
+                previous_ensemble.weighted_subnetworks[-1]
+                .subnetwork
+                .shared['dense_layer'])
+
+            dense_neuron = tf.contrib.util.constant_value(
+                previous_ensemble.weighted_subnetworks[-1]
+                .subnetwork
+                .shared['dense_neuron'])
+
+            conv_neuron = tf.contrib.util.constant_value(
+                previous_ensemble.weighted_subnetworks[-1]
+                .subnetwork
+                .shared['conv_neuron'])
+
+            dropout = tf.contrib.util.constant_value(
+                previous_ensemble.weighted_subnetworks[-1]
+                .subnetwork
+                .shared['dropout'])
+
+            learning_rate = tf.contrib.util.constant_value(
+                previous_ensemble.weighted_subnetworks[-1]
+                .subnetwork
+                .shared['learning_rate'])
+
+        if conv_layer == 4:
+            new_conv_layer = conv_layer
+            new_conv_neuron = [item+16 for item in conv_neuron]
+            
+        else:
+            new_conv_layer = conv_layer + 1
+            new_conv_neuron = [item+8 for item in conv_neuron]
+
+        if dense_layer == 2:
+            new_dense_layer = dense_layer
+            new_dense_neuron = [item+16 for item in dense_neuron]
+        else:
+            new_dense_layer = dense_layer + 1   
+            new_dense_neuron = [item+8 for item in dense_neuron]
+
+        new_dropout = [item-0.05 for item in dropout]
+        new_learning_rate = learning_rate + 0.001
+
+        
+        return [self._cnn_builder_fn(conv_layer=conv_layer, dense_layer=dense_layer, conv_neuron=conv_neuron, dense_neuron=dense_neuron, dropout=dropout, learning_rate=learning_rate), 
+        self._cnn_builder_fn(conv_layer=new_conv_layer, dense_layer=new_dense_layer, conv_neuron=new_conv_neuron, dense_neuron=new_dense_neuron, dropout=new_dropout, learning_rate=new_learning_rate)]
 
 
 class Train_adanet(Input_generator):
 
-    def __init__(self, df_path, cluster_num, CNNparam, train_steps, ada_steps, epoch, batch_size):
+    def __init__(self, df_path, cluster_num, ada_steps, epoch, batch_size, CNNparam, config_name, seed):
 
         super(Train_adanet, self).__init__(df_path, cluster_num)
 
-        self.train_step = train_steps
         self.max_step = self._X_train.shape[0] * epoch//(batch_size)
         self.iteration = self.max_step // ada_steps
         self.epoch = epoch
         self.batch_size = batch_size
         self._CNNparam = CNNparam
+        self._config = config_name
+        self._seed = seed
 
         self.train_input_fn, self.adanet_input_fn, self.val_input_fn, self.test_input_fn = self.transformation(self.batch_size, self.epoch)
 
     
+    def make_config(self, experiment_name):
+        # Estimator configuration.
+        return tf.estimator.RunConfig(
+            save_checkpoints_steps=5000,
+            save_summary_steps=5000,
+            tf_random_seed=self._seed,
+            model_dir=os.path.join('D:\\庫存健診開發\\model\\', experiment_name))
+
+
+    
     def train(self):
 
-        head = tf.contrib.estimator.binary_classification_head()
+        head = tf.contrib.estimator.binary_classification_head(loss_reduction = tf.losses.Reduction.SUM_OVER_BATCH_SIZE)
 
         self._estimator = adanet.Estimator(head=head,
-                                            subnetwork_generator=CNNGenerator(self._CNNparam),
+                                            subnetwork_generator=CNNGenerator(),
                                             max_iteration_steps=self.iteration,
                                             evaluator=adanet.Evaluator(
                                                 input_fn=self.adanet_input_fn,
                                                 steps=None),
-                                            adanet_loss_decay=.99)
+                                            adanet_loss_decay=.99,
+                                            config=self.make_config(self._config))
 
         self.results, _ = tf.estimator.train_and_evaluate(
                                             self._estimator,
@@ -284,20 +348,36 @@ class Train_adanet(Input_generator):
                                             eval_spec=tf.estimator.EvalSpec(
                                                 input_fn=self.val_input_fn,
                                                 steps=None))
+
+    
+    def ensemble_architecture(self):
+
+        architecture = self.results["architecture/adanet/ensembles"]
+    # The architecture is a serialized Summary proto for TensorBoard.
+        summary_proto = tf.summary.Summary.FromString(architecture)
+
+        return summary_proto.value[0].tensor.string_val[0]
                         
 
     def predict(self, target='test'):
 
         assert target in ['train', 'validation', 'test']
 
+        pred = []
+
         if target == 'train':
-            predictions = self._estimator.predict(input_fn=self.train_input_fn)
+            predictions = self._estimator.predict(input_fn=self.adanet_input_fn)
 
         elif target == 'validation':
             predictions = self._estimator.predict(input_fn=self.val_input_fn)
 
         elif target == 'test':
             predictions = self._estimator.predict(input_fn=self.test_input_fn)
+
+        for i, val in enumerate(predictions):
+            pred.append(val['class_ids'][0])
+
+        return np.array(pred)
 
 
     def Evaluation(self, target='test'):

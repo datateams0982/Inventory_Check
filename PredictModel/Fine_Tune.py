@@ -32,7 +32,7 @@ class Hyperparameter_Tuning:
         assert type(cluster_num) is int
 
 
-        with open(f'{df_path}Cluster_{cluster_num}_classification_minmax0_Weekly', 'rb') as fp:
+        with open(f'{df_path}Cluster_{cluster_num}_classification_minmax0_Weekly_origin', 'rb') as fp:
             self._df = pickle.load(fp)
 
         self._CNNparam = CNNparam
