@@ -45,6 +45,7 @@ def RSI(df, n):
 
     return df
 
+
 #Compute Stochastic Index
 def STO(df, nk, nD):  
     SOk = pd.Series((df['close'] - df['low'].rolling(nk).min()) / (df['high'].rolling(nk).max() - df['low'].rolling(nk).min()), name = 'SO%k'+str(nk)) 
@@ -67,7 +68,7 @@ def VWAP(row):
 
 def price_volume_trend(row):
 
-    pvt = row['vol'] * (row['close'] - row['close_lag']) / row['close_lag']
+    pvt = row['vol'] * (row['fixed_close'] - row['fixed_close_lag']) / row['fixed_close_lag']
         
     return pvt
 
@@ -137,20 +138,20 @@ def eliminate_recognition(row):
 
 def denoise_feature(data):
     d = data.sort_values(by='ts').reset_index(drop=True)
-    d['origin_close'] = d['close']
+    d['origin_close'] = d['fixed_close']
     d['eliminate_start'] = d['eliminate_period'].shift(-1)
     d['eliminate_end'] = d['eliminate_period'].shift(1)
     d['eliminate'] = d.apply(eliminate_recognition, axis=1)
     d = d.drop(columns=['eliminate_start', 'eliminate_end', 'eliminate_period'])
     d = d.sort_values(by='ts').reset_index(drop=True)
 
-    denoise_level = [[600, 3], [1200, 4], [1800, 5], [4000, 6]]
+    denoise_level = [[1200, 3], [1800, 4], [4000, 5]]
 
     if len(d[d['eliminate'] == 1]) == 0:
         for item in denoise_level:
             if len(d) <= item[0]:
                 level = item[1]
-                d['open'], d['high'], d['low'], d['close'] = WT(d['open'], lv=level, n=level), WT(d['high'], lv=level, n=level), WT(d['low'], lv=level, n=level), WT(d['close'], lv=level, n=level)
+                d['open'], d['high'], d['low'], d['close'], d['fixed_close'] = WT(d['open'], lv=level, n=level), WT(d['high'], lv=level, n=level), WT(d['low'], lv=level, n=level), WT(d['close'], lv=level, n=level), WT(d['fixed_close'], lv=level, n=level)
                 d.loc[d[d['vol'] != 0].index.tolist(), 'vol'], d.loc[d[d['vol'] != 0].index.tolist(), 'VWAP'] = WT(d.loc[d[d['vol'] != 0].index.tolist(), 'vol'], lv=level, n=level), WT(d.loc[d[d['vol'] != 0].index.tolist(), 'VWAP'], lv=level, n=level)
                 break
             else:
@@ -169,7 +170,7 @@ def denoise_feature(data):
                 break
             elif len(d1) <= item[0]:
                 level = item[1]
-                d1['open'], d1['high'], d1['low'], d1['close'] = WT(d1['open'], lv=level, n=level), WT(d1['high'], lv=level, n=level), WT(d1['low'], lv=level, n=level), WT(d1['close'], lv=level, n=level)
+                d1['open'], d1['high'], d1['low'], d1['close'], d1['fixed_close'] = WT(d1['open'], lv=level, n=level), WT(d1['high'], lv=level, n=level), WT(d1['low'], lv=level, n=level), WT(d1['close'], lv=level, n=level), WT(d1['fixed_close'], lv=level, n=level)
                 d1.loc[d1[d1['vol'] != 0].index.tolist(), 'vol'], d1.loc[d1[d1['vol'] != 0].index.tolist(), 'VWAP'] = WT(d1.loc[d1[d1['vol'] != 0].index.tolist(), 'vol'], lv=level, n=level), WT(d1.loc[d1[d1['vol'] != 0].index.tolist(), 'VWAP'], lv=level, n=level)
                 break
             else:
@@ -184,7 +185,7 @@ def denoise_feature(data):
             break
         elif len(d) <= item[0]:
             level = item[1]
-            d['open'], d['high'], d['low'], d['close'] = WT(d['open'], lv=level, n=level), WT(d['high'], lv=level, n=level), WT(d['low'], lv=level, n=level), WT(d['close'], lv=level, n=level)
+            d['open'], d['high'], d['low'], d['close'], d['fixed_close'] = WT(d['open'], lv=level, n=level), WT(d['high'], lv=level, n=level), WT(d['low'], lv=level, n=level), WT(d['close'], lv=level, n=level), WT(d['fixed_close'], lv=level, n=level)
             d.loc[d[d['vol'] != 0].index.tolist(), 'vol'], d.loc[d[d['vol'] != 0].index.tolist(), 'VWAP'] = WT(d.loc[d[d['vol'] != 0].index.tolist(), 'vol'], lv=level, n=level), WT(d.loc[d[d['vol'] != 0].index.tolist(), 'VWAP'], lv=level, n=level)
             break
         else:
@@ -218,22 +219,22 @@ def get_technical_indicators(data, SplitDate=date(2017,9,1), denoise=True):
             dataset = denoise_feature(d2)
        
     
-    dataset['close_lag'] = dataset['close'].shift(1)
+    dataset['close_lag'] = dataset['fixed_close'].shift(1)
     # Create 7 and 21 days Moving Average
-    dataset['ma7'] = dataset['close'].rolling(window=7).mean()
-    dataset['ma21'] = dataset['close'].rolling(window=21).mean()
+    dataset['ma7'] = dataset['fixed_close'].rolling(window=7).mean()
+    dataset['ma21'] = dataset['fixed_close'].rolling(window=21).mean()
     
     # Create MACD
-    dataset['26ema'] = dataset['close'].ewm(span=26, min_periods=25).mean()
-    dataset['12ema'] = dataset['close'].ewm(span=12, min_periods=11).mean()
+    dataset['26ema'] = dataset['fixed_close'].ewm(span=26, min_periods=25).mean()
+    dataset['12ema'] = dataset['fixed_close'].ewm(span=12, min_periods=11).mean()
     dataset['MACD'] = (dataset['12ema']-dataset['26ema'])
     # Create Bollinger Bands
-    dataset['20sd'] = dataset['close'].rolling(window=20).std()
+    dataset['20sd'] = dataset['fixed_close'].rolling(window=20).std()
     dataset['upper_band'] = dataset['ma21'] + (dataset['20sd']*2)
     dataset['lower_band'] = dataset['ma21'] - (dataset['20sd']*2)
 
     #Compute skewness and kurtosis
-    skew_feature = ['close', 'foreign_buy', 'investment_buy', 'dealer_buy']
+    skew_feature = ['fixed_close', 'foreign_buy', 'investment_buy', 'dealer_buy']
     for feature in skew_feature:
         dataset[f'{feature}_skew'] = dataset[feature].rolling(window=20).apply(lambda x: skew(x))
         dataset[f'{feature}_kurtosis'] = dataset[feature].rolling(window=20).apply(lambda x: kurtosis(x))
@@ -249,6 +250,7 @@ def get_technical_indicators(data, SplitDate=date(2017,9,1), denoise=True):
     dataset.loc[dataset[dataset['close'] < 0].index.tolist(), 'close'] = 0
     dataset.loc[dataset[dataset['high'] < 0].index.tolist(), 'high'] = 0
     dataset.loc[dataset[dataset['low'] < 0].index.tolist(), 'low'] = 0
+    dataset.loc[dataset[dataset['fixed_close'] < 0].index.tolist(), 'fixed_close'] = 0
     
     # Create Reletive Strength Index
     dataset = RSI(dataset, n=15)

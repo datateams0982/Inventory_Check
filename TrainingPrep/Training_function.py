@@ -135,3 +135,19 @@ def separate_elimination(data, lookback, forward, feature_list, problem='classif
     return [dataX, dataY]
 
 
+def transform_csv(X, Y, cluster_num, feature_list):
+
+    X = np.array(X)
+    X_new = X.reshape(-1, X.shape[1] * X.shape[2])
+
+    column_list = [f'{feature}_day{i+1}' for i in range(20) for feature in feature_list]
+
+    df = pd.DataFrame(data=X_new[0:,0:], index=[i for i in range(X_new.shape[0])], columns=column_list)
+    df['Y'] = [item[2] for item in Y]
+    df['ts'] = [item[0] for item in Y]
+    df['StockNo'] = [item[1] for item in Y]
+    df['cluster'] = str(cluster_num)
+
+    return df
+
+    
