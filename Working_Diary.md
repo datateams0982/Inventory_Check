@@ -75,3 +75,11 @@
 
 * Adanet
 * Model complexity evaluation, the way to iterate the model
+
+# 2019/11/04
+
+* Adanet Framework Development
+* Fixed close price
+* Index data
+* other feature?
+* Adanet model saving issue
