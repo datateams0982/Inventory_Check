@@ -47,7 +47,6 @@ def Annual_capital(data):
     capital_list = []
     for y in year:
         df = data[data['year'] == y]
-        df['capital'] = df['close'] * df['total_num']
         capital = df[df['capital'].notnull()]['capital'].mean()
         capital_list.append(capital)
 
@@ -63,14 +62,12 @@ def get_cluster_feature(data, decay):
        
     dataset['close_lag'] = dataset['close'].shift(1)
 
-
     # Create True Range
     dataset['TR'] = dataset.apply(TR, axis=1)
     dataset['TR_scale'] = dataset['TR']/dataset['close']
-    dataset['capital'] = dataset['total_num'] * dataset['close']
     
     price_ATR = time_weighted_mean(dataset['TR_scale'].dropna(), decay=decay)
-    total_mean = time_weighted_mean(dataset['total'].dropna(), decay=decay)
+    total_mean = time_weighted_mean(dataset[dataset['total'] != 0]['total'].dropna(), decay=decay)
     capital = Annual_capital(dataset)
     stockname = dataset['StockName'].iloc[0]
 

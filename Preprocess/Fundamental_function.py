@@ -14,8 +14,9 @@ def read_fundamental(filename, file_path):
             fw.write(line.encode('utf-8'))
 
     df = pd.read_csv(f'{file_path}{filename[:4]}.csv', converters={'股票代號': str})
-    d = df[['年度', '股票代號', '股票名稱', '交易所普通股股本(千)']].rename(columns={'年度': 'year', '股票代號': 'StockNo', '股票名稱': 'StockName', '交易所普通股股本(千)': 'total_num'})
+    d = df[['年度', '股票代號', '股票名稱', '交易所普通股股本(千)', '上市日期']].rename(columns={'年度': 'year', '股票代號': 'StockNo', '股票名稱': 'StockName', '交易所普通股股本(千)': 'total_num', '上市日期': 'On_Date'})
     d['total_num'] = d['total_num'] * 100
+    d['On_Date'] = d['On_Date'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
     
     return d
 
@@ -36,17 +37,6 @@ def read_eliminate(filename, file_path):
     return d
 
 
-def read_increase(filename, file_path):
-    with open(f'{file_path}{filename}', 'r', encoding="ansi") as fp, \
-        open(f'{file_path}{filename[:4]}.csv', 'wb') as fw:
-        for line in fp.readlines():
-            fw.write(line.encode('utf-8'))
-
-    df = pd.read_csv(f'{file_path}{filename[:4]}.csv', converters={'股票代號': str})
-    d = df[['年度', '股票代號', '股票名稱', '除權日']].rename(columns={'年度': 'year', '股票代號': 'StockNo', '股票名稱': 'StockName', '除權日': 'increase_date'})
-    d['increase_date'] = d['increase_date'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
-    
-    return d
 
 
 def read_inventory(filename, file_path):
@@ -73,3 +63,40 @@ def read_fixed_price(filename, file_path):
     d['ts'] = d['ts'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
     
     return d
+
+
+def read_index(filename, file_path):
+
+    df = pd.read_csv(f'{file_path}{filename}')
+    date = datetime.strptime(filename[-14:-4], '%Y-%m-%d').date()
+    reference = {}
+    for col in df.columns.tolist():
+        if col not in [ '日期', '時間', '未含金融保險股指數', '未含金融電子股指數', '未含電子股指數']:
+            open_price = df.iloc[0][col]
+            high = df[col].max()
+            low = df[col].min()
+            close = df.iloc[-1][col]
+            reference[col] = [open_price, high, low, close]
+        else:
+            continue
+
+    return [reference, date]
+    
+
+def read_off_stock(filename, file_path):
+    
+    with open(f'{file_path}{filename}', 'r', encoding="ansi") as fp, \
+        open(f'{file_path}{filename[:8]}.csv', 'wb') as fw:
+        for line in fp.readlines():
+            fw.write(line.encode('utf-8'))
+
+    df = pd.read_csv(f'{file_path}{filename[:8]}.csv', converters={'股票代號': str})
+    d = df[['股票代號', '終止日期']].rename(columns={'股票代號': 'StockNo', '終止日期': 'Off_Date'})
+    d['Off_Date'] = d['Off_Date'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
+    
+    return d
+
+
+
+
+

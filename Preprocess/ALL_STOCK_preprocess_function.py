@@ -2,8 +2,7 @@ import numpy as np
 import pandas as pd 
 import os
 import datetime
-from datetime import datetime
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from sklearn.preprocessing import OneHotEncoder
 from tqdm import tqdm_notebook as tqdm
 import calendar
@@ -43,106 +42,207 @@ def send_query_to_MSSQL(query, db = 'ODS', timecost = True, showcol = True, show
 
     return df
 
-def TransformOnDate(row):
-    if (row['On_Date'] == 0) or (row['On_Date'] == 99999999):
-        return np.nan
-    else:
-        date = datetime.strptime((str(row['On_Date'])[:4] + '-' + str(row['On_Date'])[4:6] + '-' + str(row['On_Date'])[6:]), '%Y-%m-%d').date()
-        return date
 
+def read_off_stock(filename, file_path, save_path):
 
-def TransformOffDate(row):
-    if row['Off_Date'] == '00000000':
-        return np.nan
-    else:
-        date = datetime.strptime((str(row['Off_Date'])[:4] + '-' + str(row['Off_Date'])[4:6] + '-' + str(row['Off_Date'])[6:]), '%Y-%m-%d').date()
-        return date
+    directory = save_path
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    
+    with open(f'{file_path}{filename}', 'r', encoding="ansi") as fp, \
+        open(f'{save_path}{filename[:4]}.csv', 'wb') as fw:
+        for line in fp.readlines():
+            fw.write(line.encode('utf-8'))
 
-
-#From MsSQL Extract Trading Data
-def get_stock():
-
-    query = f"""
-        SELECT STOCK_NO
-                ,CFC14
-                ,CFC61
-        FROM ODS.dbo.ST_STOCK_TABLE
-            """
-
-
-    stock = send_query_to_MSSQL(query, db='ODS')
-    stock.columns = ['StockNo', 'On_Date', 'Off_Date']
-    stock['StockNo'] = stock['StockNo'].apply(lambda x: str(x).replace(" ", ""))
-
-    return stock
-
-def data_preprocess(filename):
-    d = pd.read_csv(filename, converters={'StockNo': str, 'StockName': str})
-    date = filename[-14:-4]
-    d['ts'] = datetime.strptime(date, '%Y-%m-%d').date()
-    d[['open', 'high', 'low', 'close']] = d[['open', 'high', 'low', 'close']].replace('--', np.nan)
-    d['vol'], d['total'], d['open'], d['close'], d['high'], d['low'] = d['vol'].apply(lambda x: str(x).replace(',', '')), d['total'].apply(lambda x: str(x).replace(',', '')), d['open'].apply(lambda x: str(x).replace(',', '')), d['close'].apply(lambda x: str(x).replace(',', '')), d['high'].apply(lambda x: str(x).replace(',', '')), d['low'].apply(lambda x: str(x).replace(',', ''))
-    d[['vol', 'total', 'open', 'high', 'low', 'close']] = d[['vol', 'total', 'open', 'high', 'low', 'close']].astype(np.float)
+    df = pd.read_csv(f'{save_path}{filename[:4]}.csv', converters={'股票代號': str})
+    d = df[['股票代號', '終止日期']].rename(columns={'股票代號': 'StockNo', '終止日期': 'Off_Date'})
+    d['Off_Date'] = d['Off_Date'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
     
     return d
 
 
-def GetStockList(data):
-    stock_list = data['StockNo'].unique().tolist()
+def data_preprocess(filename, file_path, save_path):
+
+    directory = save_path
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+    with open(f'{file_path}{filename}', 'r', encoding="ansi") as fp, \
+        open(f'{save_path}{filename[:8]}.csv', 'wb') as fw:
+        for line in fp.readlines():
+            fw.write(line.encode('utf-8'))
+
+    df = pd.read_csv(f'{save_path}{filename[:8]}.csv', converters={'日期': str, '股票代號': str})
+    df = df[['日期', '股票代號', '股票名稱', '開盤價', '最高價', '最低價', '收盤價', '成交量', '成交金額(千)', '總市值(億)']].rename(columns={'日期': 'ts', '股票代號': 'StockNo', '股票名稱': 'StockName', '開盤價': 'open', '最高價': 'high', '最低價': 'low', '收盤價': 'close', '成交量': 'vol', '成交金額(千)': 'total', '總市值(億)': 'capital'})
+    
+    stock_list = df['StockNo'].unique().tolist()
     stock = [s for s in stock_list if (len(s) == 4) and (s[0] in [str(i) for i in range(1,10)])]
-        
-    return stock
+    
+    d = df[df.StockNo.isin(stock)]
+    
+    d['VWAP'] = d['total']/d['vol']
+    d['ts'] = d['ts'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
+
+    index = df[df['StockName'] == '加權指數'][['ts', 'open', 'high', 'low', 'close', 'vol']].rename(columns={'open': 'index_open', 'high': 'index_high', 'low': 'index_low', 'close': 'index_close', 'vol': 'index_vol'})
+    
+    industry_list = [s for s in stock_list if s[:3] == 'TWB']
+    industry_index = df[df.StockNo.isin(industry_list)][['ts', 'StockNo', 'open', 'high', 'low', 'close', 'vol']].rename(columns={'StockNo': 'reference', 'open': 'industry_open', 'high': 'industry_high', 'low': 'industry_low', 'close': 'industry_close', 'vol': 'industry_vol'})
+
+    return [d, index, industry_index]
 
 
-def FillMissingTime(data, timedf):
-    data['ts'] = pd.to_datetime(data['ts'])
+def read_eliminate(filename, file_path, save_path):
+
+    directory = save_path
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+    with open(f'{file_path}{filename}', 'r', encoding="ansi") as fp, \
+        open(f'{save_path}{filename[:4]}.csv', 'wb') as fw:
+        for line in fp.readlines():
+            fw.write(line.encode('utf-8'))
+
+    df = pd.read_csv(f'{save_path}{filename[:4]}.csv', converters={'股票代號': str})
+    d = df[['年度', '股票代號', '股票名稱', '停止交易起始日', '開始買賣日期']].rename(columns={'年度': 'year', '股票代號': 'StockNo', '股票名稱': 'StockName', '停止交易起始日': 'Stop_date', '開始買賣日期': 'Restart_date'})
+    d['Stop_date'] = d['Stop_date'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
+    d['Restart_date'] = d['Restart_date'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
+    
+    return d
+
+
+def read_inventory(filename, file_path, save_path):
+
+    directory = save_path
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+    with open(f'{file_path}{filename}', 'r', encoding="ansi") as fp, \
+        open(f'{save_path}{filename[:8]}.csv', 'wb') as fw:
+        for line in fp.readlines():
+            fw.write(line.encode('utf-8'))
+
+    df = pd.read_csv(f'{save_path}{filename[:8]}.csv', converters={'股票代號': str})
+    d = df[['日期', '股票代號', '外資買賣超', '投信買賣超', '自營商買賣超']].rename(columns={'日期': 'ts', '股票代號': 'StockNo', '外資買賣超': 'foreign_buy', '投信買賣超': 'investment_buy', '自營商買賣超': 'dealer_buy'})
+    d['ts'] = d['ts'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
+    
+    return d
+
+
+def read_fundamental(filename, file_path, save_path):
+
+    directory = save_path
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+    with open(f'{file_path}{filename}', 'r', encoding="ansi") as fp, \
+        open(f'{save_path}{filename[:4]}.csv', 'wb') as fw:
+        for line in fp.readlines():
+            fw.write(line.encode('utf-8'))
+
+    df = pd.read_csv(f'{save_path}{filename[:4]}.csv', converters={'股票代號': str, '上市日期': str})
+    d = df[['年度', '股票代號', '上市日期', '產業名稱', '上市上櫃']].rename(columns={'年度': 'year', '股票代號': 'StockNo', '上市日期': 'On_Date', '產業名稱': 'industry', '上市上櫃': 'on'})
+    d = d[d['on'] == 1][d['On_Date'] != '']
+    d['On_Date'] = d['On_Date'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
+    
+    return d
+
+
+def filter_stocks(data, fundamental, offstock):
+
+    df = data[~data.StockNo.isin(offstock.StockNo.unique().tolist())]
+    df = pd.merge(df, fundamental[['StockNo', 'On_Date']].drop_duplicates(), on='StockNo', how='inner')
+
+    df = df[df.ts.dt.date > date(2007,7,1)][df.ts.dt.date < date(2019,9,24)]
+    non_stock = fundamental[fundamental.industry == '存託憑證']['StockNo'].unique().tolist()
+    df = df[~df.StockNo.isin(non_stock)]
+
+    df.to_csv('D:\\庫存健診開發\\data\\processed\\TWSE_stock.csv', index=False)
+
+    return df
+
+
+
+def FillMissingTime(data, timedf, ondate, eliminate):
+
     data = data.sort_values(by='ts')
+    Stock = data['StockNo'].unique()[0]
+    timedf = timedf[timedf.ts >= data['On_Date'].iloc[0]]
 
-    status = True
+    d = pd.merge(timedf, data, on="ts", how="left")
+    d = d.sort_values(by="ts")
 
-    if len(data) == len(timedf):
-        data["open"] = data["open"].interpolate(method="pad")
-        data["high"] = data["high"].interpolate(method="pad")
-        data["low"] = data["low"].interpolate(method="pad")
-        data["close"] = data["close"].interpolate(method="pad")
+    interpolate = ['open', 'high', 'low', 'close', 'capital', 'StockNo', 'StockName']
+    zero = ['total', 'vol', 'VWAP']
 
-        data["vol"] = data["vol"].fillna(0)
-        data["total"] = data["total"].fillna(0)
-        data['return'] = data['close'] - data['close'].shift(1)
-        data['return'] = data['close'] - data['close'].shift(1)
-        
-        return [status, data]
+    for col in interpolate:
+        d[col] = d[col].interpolate(method="pad")
+    
+    for col in zero:
+        d[col] = d[col].fillna(0)
+
+
+    d['eliminate'] = 0
+    df = eliminate[eliminate.StockNo == Stock]
+    if len(df) == 0:
+        d = d.drop(columns=['On_Date'])
+        return d.sort_values(by='ts')
 
     else:
-        End_date = data['ts'].iloc[-1]
+        stop = df['Stop_date'].tolist()
+        start = df['Restart_date'].tolist()
+        d.loc[d[d.ts.isin(stop)].index.tolist(), 'eliminate'] = 1
+        d.loc[d[d.ts.isin(start)].index.tolist(), 'eliminate'] = 2
+        d = d.drop(columns=['On_Date'])
+
+        return d.sort_values(by='ts')
+
+
+def industry_reference(row):
+
+    industry_dict = {'水泥工業': 'TWB11', '食品工業': 'TWB12', 
+                    '塑膠工業': 'TWB13', '建材營建': 'TWB25', 
+                    '化學工業': 'TWB30', '汽車工業': 'TWB22', 
+                    '紡織纖維': 'TWB14', '貿易百貨': 'TWB29',
+                    '其他': 'TWB99', '電子–電子通路': 'TWB38', 
+                    '電子–半導體': 'TWB33', '電子–電子零組件': 'TWB37', 
+                    '電機機械': 'TWB15', '鋼鐵工業': 'TWB20', 
+                    '生技醫療': 'TWB31','電器電纜': 'TWB16', 
+                    '電子–電腦及週邊設備': 'TWB34', '玻璃陶瓷': 'TWB18', 
+                    '造紙工業': 'TWB19', '橡膠工業': 'TWB21', 
+                    '航運業': 'TWB26', '電子–其他電子': 'TWB40',
+                    '電子–通信網路': 'TWB36', '電子–光電': 'TWB35', 
+                    '電子–資訊服務': 'TWB39', '油電燃氣': 'TWB32', 
+                    '觀光事業': 'TWB27', '金融保險': 'TWB28'}
+
+    if row['industry'] not in industry_dict:
+        return np.nan
+
+    reference = industry_dict[row['industry']]
+
+    return reference
+
         
-        if End_date < datetime.strptime('2019-09-23', '%Y-%m-%d').date():
-            status = False
-            return [status]
-        
-        if len(data[data.OnDate.notnull()]) == 0:
-            time_df = timedf[timedf.ts.dt.date <= End_date]
-        
-        else:
-            Start_date = data['OnDate'].iloc[0]
-            time_df = timedf[timedf.ts.dt.date >= Start_date]
-            time_df = time_df[time_df.ts.dt.date <= End_date]
-        
-        d = pd.merge(time_df, data, on="ts", how="left")
 
-        d = d.sort_values(by="ts")
+def merge_index(data, index, industry_index, fundamental):
 
-        d['StockNo'] = data['StockNo'].unique()[0]
-        d['StockName'] = data['StockName'].unique()[0]
+    data['year'] = data.ts.dt.year
+    d = pd.merge(data, fundamental[['year', 'StockNo', 'industry']], on=['year', 'StockNo'], how='left')
+    if len(d.loc[d[d['year'] < 2009].index.tolist(), 'industry']) != 0:
+        d.loc[d[d['year'] < 2009].index.tolist(), 'industry'] = d.loc[d[d['year'] == 2009].index.tolist()]['industry'].iloc[0]
 
-        d["open"] = d["open"].interpolate(method="pad")
-        d["high"] = d["high"].interpolate(method="pad")
-        d["low"] = d["low"].interpolate(method="pad")
-        d["close"] = d["close"].interpolate(method="pad")
+    d['reference'] = d.apply(industry_reference, axis=1)
+    df = pd.merge(d, index, on='ts', how='left')
+    df = pd.merge(df, industry_index, on=['ts', 'reference'], how='left')
+    df = df.drop(columns=['reference'])
 
-        d["vol"] = d["vol"].fillna(0)
-        d["total"] = d["total"].fillna(0)
-        d['return'] = d['close'] - d['close'].shift(1)
+    return df
+    
 
-        return [status, d.sort_values(by='ts')]
+
+    
+    
+
+
+
+
 
