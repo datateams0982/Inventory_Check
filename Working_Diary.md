@@ -103,7 +103,7 @@
     * variance on test: 0.036
     * variance on val: 0.05
     * ratio under 60%: 4.6% (test), 32.6% (val)
-    * threshold 0.6 precision (test): 71% (down 35313), 72% (up 77231)
+    * threshold 0.6 precision (test): 71% (down 98554), 72% (up 77231)
     * 2017: 63%, 2018: 64%, 2019: 68%, 2017/09: 62%
     * threshold 0.6 precision (val):  66% (down 38320), 71% (up 23820)
     
