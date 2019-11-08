@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, date
 from sklearn.preprocessing import OneHotEncoder
 from tqdm import tqdm_notebook as tqdm
 from scipy.stats import skew, kurtosis
+from sklearn.preprocessing import MinMaxScaler
 import calendar
 import math
 import pywt 

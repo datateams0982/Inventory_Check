@@ -11,32 +11,64 @@ from datetime import datetime, timedelta, date
 
 def TrainTestSplit(data, TrainDate, valDate):
 
-    train_df = data[data['ts'].dt.date < TrainDate][data['26ema'].notnull()]
-    val_df = data[data['ts'].dt.date < valDate][data['ts'].dt.date >= TrainDate][data['26ema'].notnull()]
-    test_df = data[data['ts'].dt.date >= valDate][data['26ema'].notnull()]
+    train_df = data[data['ts'].dt.date < TrainDate][data['ema26'].notnull()]
+    train_df = train_df.replace([np.inf, -np.inf], np.nan)
+    val_df = data[data['ts'].dt.date < valDate][data['ts'].dt.date >= TrainDate][data['ema26'].notnull()]
+    val_df = val_df.replace([np.inf, -np.inf], np.nan)
+    test_df = data[data['ts'].dt.date >= valDate][data['ema26'].notnull()]
+    test_df = test_df.replace([np.inf, -np.inf], np.nan)
+
+    train_df, val_df, test_df = train_df.fillna(0), val_df.fillna(0), test_df.fillna(0)
 
     return train_df, val_df, test_df
 
 
-def ClusterSplit(cluster_train, cluster_test, data, filepath):
+def ClusterSplit(cluster_train, cluster_test, data, filepath, train_date=date(2017,9,1)):
 
     '''
     Split data into different clusters.
     Input the dataframe containing labels(clusterdata), dataframe containing all stocks, total cluster and writing path
     '''
 
-    train = data[data['ts'].dt.date < date(2017,9,1)]
-    test = data[data['ts'].dt.date >= date(2017,9,1)]
+    train = data[data['ts'].dt.date < train_date]
+    test = data[data['ts'].dt.date >= train_date]
     cluster_num = len(cluster_train['cluster'].unique())
 
     for i in tqdm(range(cluster_num)):
-        stock_list_train = cluster_train[cluster_train['cluster'] == i].index.tolist()
-        stock_list_test = cluster_test[cluster_test['cluster'] == i].index.tolist()
-        train_df = train[train['StockName'].isin(stock_list_train)]
-        test_df = test[test['StockName'].isin(stock_list_test)]
+        stock_list_train = [str(i) for i in cluster_train[cluster_train['cluster'] == i].index.tolist()]
+        stock_list_test = [str(i) for i in cluster_test[cluster_test['cluster'] == i].index.tolist()]
+        train_df = train[train['StockNo'].isin(stock_list_train)]
+        test_df = test[test['StockNo'].isin(stock_list_test)]
 
         df = pd.concat([train_df, test_df], axis=0)
         df.to_csv(filepath + 'Cluster_{}.csv'.format(i), index=False)
+
+
+def total_split(cluster_train, cluster_test, data, filepath, train_date=date(2017,9,1)):
+
+    '''
+    Split data into different clusters.
+    Input the dataframe containing labels(clusterdata), dataframe containing all stocks, total cluster and writing path
+    '''
+
+    train = data[data['ts'].dt.date < train_date]
+    test = data[data['ts'].dt.date >= train_date]
+    train_list, test_list = [], []
+
+    for i in tqdm(range(5)):
+        stock_list_train = [str(i) for i in cluster_train[cluster_train['cluster'] == i].index.tolist()]
+        stock_list_test = [str(i) for i in cluster_test[cluster_test['cluster'] == i].index.tolist()]
+        train_df = train[train['StockNo'].isin(stock_list_train)]
+        train_df['cluster'] = i
+        test_df = test[test['StockNo'].isin(stock_list_test)]
+        test_df['cluster'] = i
+
+        train_list.append(train_df)
+        test_list.append(test_df)
+
+    train, test = pd.concat(train_list, axis=0), pd.concat(test_list, axis=0)
+    df = pd.concat([train, test], axis=0)
+    df.to_csv(filepath + 'large.csv', index=False)
 
 
 def GetScalerParam(train_df, feature_list):
@@ -116,7 +148,7 @@ def separate_elimination(data, lookback, forward, feature_list, problem='classif
     if len(d[d['eliminate'] != 0]) == 0:
         return create_dataset(d, lookback, forward, feature_list, problem='classification')
 
-    start_date = d[d['eliminate'] == 2]['ts'].tolist()
+    start_date = d[d['eliminate'] == 1]['ts'].tolist()
     start_date.sort(reverse=True)
     dataX = []
     dataY = []
@@ -135,7 +167,22 @@ def separate_elimination(data, lookback, forward, feature_list, problem='classif
     return [dataX, dataY]
 
 
-def transform_csv(X, Y, cluster_num, feature_list):
+def transform_whole_csv(X, Y, feature_list):
+
+    X = np.array(X)
+    X_new = X.reshape(-1, X.shape[1] * X.shape[2])
+
+    column_list = [f'{feature}_day{i+1}' for i in range(20) for feature in feature_list]
+
+    df = pd.DataFrame(data=X_new[0:,0:], index=[i for i in range(X_new.shape[0])], columns=column_list)
+    df['Y'] = [item[2] for item in Y]
+    df['ts'] = [item[0] for item in Y]
+    df['StockNo'] = [item[1] for item in Y]
+
+    return df
+
+
+def transform_cluster_csv(X, Y, cluster_num, feature_list):
 
     X = np.array(X)
     X_new = X.reshape(-1, X.shape[1] * X.shape[2])
@@ -149,5 +196,4 @@ def transform_csv(X, Y, cluster_num, feature_list):
     df['cluster'] = str(cluster_num)
 
     return df
-
     

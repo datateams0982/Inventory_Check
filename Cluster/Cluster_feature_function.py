@@ -47,7 +47,7 @@ def Annual_capital(data):
     capital_list = []
     for y in year:
         df = data[data['year'] == y]
-        capital = df[df['capital'].notnull()]['capital'].mean()
+        capital = df[df['capital']!=0]['capital'].mean()
         capital_list.append(capital)
 
     annual_capital = time_weighted_mean(pd.Series(capital_list), decay = 0.9)
@@ -69,9 +69,9 @@ def get_cluster_feature(data, decay):
     price_ATR = time_weighted_mean(dataset['TR_scale'].dropna(), decay=decay)
     total_mean = time_weighted_mean(dataset[dataset['total'] != 0]['total'].dropna(), decay=decay)
     capital = Annual_capital(dataset)
-    stockname = dataset['StockName'].iloc[0]
+    stockno = dataset['StockNo'].iloc[0]
 
-    series = pd.Series([total_mean, price_ATR, capital]).rename(stockname)
+    series = pd.Series([total_mean, price_ATR, capital]).rename(stockno)
 
     return series
 

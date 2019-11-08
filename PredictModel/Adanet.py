@@ -17,17 +17,32 @@ import adanet
 
 class Input_generator:
 
-    def __init__(self, df_path, cluster_num):
+    def __init__(self, df_path, cluster_num, problem='whole'):
 
-        with open(f'{df_path}Cluster_{cluster_num}_classification_minmax0_Weekly', 'rb') as fp:
-            self._df = pickle.load(fp)
+        if problem == 'cluster':
+            with open(f'{df_path}Cluster_{cluster_num}_classification_minmax0_Weekly', 'rb') as fp:
+                self._df = pickle.load(fp)
 
-        self._X_train = np.array(self._df[0]).astype(np.float32)
-        self._Y_train = self._df[1]
-        self._X_val = np.array(self._df[2]).astype(np.float32)
-        self._Y_val = self._df[3]
-        self._X_test = np.array(self._df[4]).astype(np.float32)
-        self._Y_test = self._df[5]
+            self._X_train = np.array(self._df[0]).astype(np.float32)
+            self._Y_train = self._df[1]
+            self._X_val = np.array(self._df[2]).astype(np.float32)
+            self._Y_val = self._df[3]
+            self._X_test = np.array(self._df[4]).astype(np.float32)
+            self._Y_test = self._df[5]
+
+        else:
+            with open(f'{df_path}Whole_classification_minmax0_Weekly_train', 'rb') as fp:
+                df = pickle.load(fp)
+            self._X_train = np.array(df[0]).astype(np.float32)
+            self._Y_train = df[1]
+            with open(f'{df_path}Whole_classification_minmax0_Weekly_val', 'rb') as fp:
+                df = pickle.load(fp)
+            self._X_val = np.array(df[0]).astype(np.float32)
+            self._Y_val = df[1]
+            with open(f'{df_path}Whole_classification_minmax0_Weekly_test', 'rb') as fp:
+                df = pickle.load(fp)
+            self._X_test = np.array(df[0]).astype(np.float32)
+            self._Y_test = df[1]
 
     @property
     def X_train(self):
@@ -370,55 +385,58 @@ class LinearBuilder(adanet.subnetwork.Builder):
 
 class Generator(adanet.subnetwork.Generator):
 
-    def __init__(self):
+    def __init__(self, initial_param):
 
         self._cnn_builder_fn = CNNBuilder
         self._dnn_builder_fn = DNNBuilder
         self._linear_fn = LinearBuilder
+        self._param = initial_param
         
     
-    def new_param(self, iteration_number, conv_layer, conv_neuron, dense_layer_CNN, dense_neuron_CNN, dropout_CNN, 
-                  dense_layer, dense_neuron, dropout):
+    def _new_param(self, iteration_number):
         
-        conv_mod = (iteration_number+1) % 4
+        all_mod = (iteration_number+1) % 8
         conv_iter_round = (iteration_number+1) // 8
         conv_dense_mod = (iteration_number+1) % 8
+        conv_mod = (iteration_number+1) % 4
         
         mod = (iteration_number+1) % 4
         iter_round = (iteration_number+1) // 4
         
-        new_conv_neuron = [item+16*conv_iter_round for item in conv_neuron]
-        new_dense_neuron_CNN = [item+16*conv_iter_round for item in dense_neuron_CNN]
-        new_dense_neuron = [item+8*iter_round for item in dense_neuron]
+        new_conv_neuron = [item+16*conv_iter_round for item in self._param['conv_neuron']]
+        new_dense_neuron_CNN = [item+16*conv_iter_round for item in self._param['dense_neuron_CNN']]
+        new_dense_neuron = [item+8*iter_round for item in self._param['dense_neuron']]
         
-        if conv_mod == 0:
+        if all_mod == 0:
             new_conv_layer = 1
-            new_dropout_CNN = [min(0.05*conv_iter_round, 0.3) for item in dropout_CNN]
+            new_dropout_CNN = [min(0.05*conv_iter_round, 0.3) for item in self._param['dropout_CNN']]
             new_dense_layer_CNN = 1    
                              
-        elif conv_mod == 4:
+        elif all_mod == 4:
             new_conv_layer = 1
-            new_dropout_CNN = [min(0.05*conv_iter_round, 0.3) for item in dropout_CNN]
+            new_dropout_CNN = [min(0.05*conv_iter_round, 0.3) for item in self._param['dropout_CNN']]
             new_dense_layer_CNN = 2
 
         else:
             new_conv_layer = conv_mod
-            new_dropout_CNN = [min(0.05*conv_iter_round + 0.05*(conv_mod-1), 0.3) for item in dropout_CNN]
-            if conv_mod > 4:
+            new_dropout_CNN = [min(0.05*conv_iter_round + 0.05*(conv_mod-1), 0.3) for item in self._param['dropout_CNN']]
+            if all_mod > 4:
                 new_dense_layer_CNN = 2
             else:
                 new_dense_layer_CNN = 1
                 
         if mod == 0:
-            new_dropout = [min(0.05*iter_round, 0.3) for item in dropout]
+            new_dropout = [min(0.05*iter_round, 0.3) for item in self._param['dropout']]
             new_dense_layer = 1            
 
         else:
             new_dense_layer = mod
-            new_dropout = [min(0.05*iter_round + 0.05*(mod-1), 0.3) for item in dropout]
+            new_dropout = [min(0.05*iter_round + 0.05*(mod-1), 0.3) for item in self._param['dropout']]
+
+        learning_rate = self._param['learning_rate']
             
         return [new_conv_layer, new_conv_neuron, new_dense_layer_CNN, new_dense_neuron_CNN, new_dropout_CNN, 
-                  new_dense_layer, new_dense_neuron, new_dropout]
+                  new_dense_layer, new_dense_neuron, new_dropout, learning_rate]
 
         
 
@@ -428,18 +446,9 @@ class Generator(adanet.subnetwork.Generator):
                                 previous_ensemble_reports,
                                 all_reports):
 
-        conv_layer = 1
-        dense_layer_CNN = 1
-        dense_layer = 1
-        dense_neuron_CNN = [128, 16]  
-        dense_neuron = [128, 64, 64, 32]
-        dropout_CNN = [0, 0, 0, 0]
-        dropout = [0, 0, 0, 0]
-        conv_neuron = [32, 64, 64, 128]
-        learning_rate = 0.001
         
-        param = self.new_param(iteration_number, conv_layer, conv_neuron, dense_layer_CNN, dense_neuron_CNN, dropout_CNN, 
-                  dense_layer, dense_neuron, dropout)
+        
+        param = self._new_param(iteration_number)
 
 
         if previous_ensemble:
@@ -479,10 +488,10 @@ class Generator(adanet.subnetwork.Generator):
                     .subnetwork
                     .shared['learning_rate'])
                 
-                return [self._cnn_builder_fn(conv_layer=conv_layer, dense_layer=dense_layer_CNN, conv_neuron=conv_neuron, dense_neuron=dense_neuron_CNN, dropout=dropout_CNN, learning_rate=learning_rate), 
-                        self._cnn_builder_fn(conv_layer=param[0], dense_layer=param[2], conv_neuron=param[1], dense_neuron=param[3], dropout=param[4], learning_rate=learning_rate),
-                        self._dnn_builder_fn(dense_layer=param[5], dense_neuron=param[6], dropout=param[7], learning_rate=learning_rate),
-                        self._linear_fn(learning_rate)]
+                return [self._cnn_builder_fn(conv_layer=conv_layer, dense_layer=dense_layer_CNN, conv_neuron=conv_neuron, dense_neuron=dense_neuron_CNN, dropout=dropout_CNN, learning_rate=param[-1]), 
+                        self._cnn_builder_fn(conv_layer=param[0], dense_layer=param[2], conv_neuron=param[1], dense_neuron=param[3], dropout=param[4], learning_rate=param[-1]),
+                        self._dnn_builder_fn(dense_layer=param[5], dense_neuron=param[6], dropout=param[7], learning_rate=param[-1]),
+                        self._linear_fn(param[-1])]
             
                 
             elif tf.contrib.util.constant_value(
@@ -511,22 +520,22 @@ class Generator(adanet.subnetwork.Generator):
                     .subnetwork
                     .shared['learning_rate'])
                 
-                return [self._dnn_builder_fn(dense_layer=dense_layer, dense_neuron=dense_neuron, dropout=dropout, learning_rate=learning_rate), 
-                        self._cnn_builder_fn(conv_layer=param[0], dense_layer=param[2], conv_neuron=param[1], dense_neuron=param[3], dropout=param[4], learning_rate=learning_rate),
-                        self._dnn_builder_fn(dense_layer=param[5], dense_neuron=param[6], dropout=param[7], learning_rate=learning_rate),
-                        self._linear_fn(learning_rate)]
+                return [self._dnn_builder_fn(dense_layer=dense_layer, dense_neuron=dense_neuron, dropout=dropout, learning_rate=param[-1]), 
+                        self._cnn_builder_fn(conv_layer=param[0], dense_layer=param[2], conv_neuron=param[1], dense_neuron=param[3], dropout=param[4], learning_rate=param[-1]),
+                        self._dnn_builder_fn(dense_layer=param[5], dense_neuron=param[6], dropout=param[7], learning_rate=param[-1]),
+                        self._linear_fn(param[-1])]
             
             
             else:
                 
-                return [self._linear_fn(learning_rate), 
-                        self._cnn_builder_fn(conv_layer=param[0], dense_layer=param[2], conv_neuron=param[1], dense_neuron=param[3], dropout=param[4], learning_rate=learning_rate),
-                        self._dnn_builder_fn(dense_layer=param[5], dense_neuron=param[6], dropout=param[7], learning_rate=learning_rate),
-                        self._linear_fn(learning_rate)]
+                return [self._linear_fn(param[-1]), 
+                        self._cnn_builder_fn(conv_layer=param[0], dense_layer=param[2], conv_neuron=param[1], dense_neuron=param[3], dropout=param[4], learning_rate=param[-1]),
+                        self._dnn_builder_fn(dense_layer=param[5], dense_neuron=param[6], dropout=param[7], learning_rate=param[-1]),
+                        self._linear_fn(param[-1])]
                 
-        return [self._linear_fn(learning_rate), 
-                self._dnn_builder_fn(dense_layer=dense_layer, dense_neuron=dense_neuron, dropout=dropout, learning_rate=learning_rate),
-                self._cnn_builder_fn(conv_layer=conv_layer, dense_layer=dense_layer_CNN, conv_neuron=conv_neuron, dense_neuron=dense_neuron_CNN, dropout=dropout_CNN, learning_rate=learning_rate)]
+        return [self._linear_fn(param[-1]), 
+                self._dnn_builder_fn(dense_layer=self._param['dense_layer'], dense_neuron=self._param['dense_neuron'], dropout=self._param['dropout'], learning_rate=param[-1]),
+                self._cnn_builder_fn(conv_layer=self._param['conv_layer'], dense_layer=self._param['dense_layer_CNN'], conv_neuron=self._param['conv_neuron'], dense_neuron=self._param['dense_neuron_CNN'], dropout=self._param['dropout_CNN'], learning_rate=param[-1])]
         
 
 
@@ -534,9 +543,17 @@ class Generator(adanet.subnetwork.Generator):
 
 class Train_adanet(Input_generator):
 
-    def __init__(self, df_path, cluster_num, ada_steps, epoch, batch_size, model_path, config_name, penalty=0.005):
+    def __init__(self, df_path, cluster_num, ada_steps, epoch, batch_size, model_path, config_name, initial_param={'conv_layer': 1,
+                                                                                                                    'dense_layer_CNN': 1,
+                                                                                                                    'dense_layer': 1,
+                                                                                                                    'dense_neuron_CNN': [128, 16] , 
+                                                                                                                    'dense_neuron': [128, 64, 64, 32],
+                                                                                                                    'dropout_CNN': [0, 0, 0, 0],
+                                                                                                                    'dropout': [0, 0, 0, 0],
+                                                                                                                    'conv_neuron': [32, 64, 64, 128],
+                                                                                                                    'learning_rate': 0.001}, penalty=0.005, problem='whole'):
 
-        super(Train_adanet, self).__init__(df_path, cluster_num)
+        super(Train_adanet, self).__init__(df_path, cluster_num, problem)
 
         self.max_step = self._X_train.shape[0] * epoch//(batch_size)
         self.iteration = self.max_step // ada_steps
@@ -551,7 +568,7 @@ class Train_adanet(Input_generator):
         self._head = tf.contrib.estimator.binary_classification_head(loss_reduction = tf.losses.Reduction.SUM_OVER_BATCH_SIZE)
 
         self._estimator = adanet.Estimator(head=self._head,
-                                            subnetwork_generator=Generator(),
+                                            subnetwork_generator=Generator(initial_param),
                                             adanet_lambda=self._penalty,
                                             max_iteration_steps=self.iteration,
                                             evaluator=adanet.Evaluator(
@@ -571,8 +588,7 @@ class Train_adanet(Input_generator):
 
     
     def Net_train(self):
-
-        
+    
         self.results, _ = tf.estimator.train_and_evaluate(
                                             self._estimator,
                                             train_spec=tf.estimator.TrainSpec(
@@ -590,6 +606,17 @@ class Train_adanet(Input_generator):
         summary_proto = tf.summary.Summary.FromString(architecture)
 
         return summary_proto.value[0].tensor.string_val[0]
+        
+
+    def save_model(self, model_path):
+
+        def serving_input_fn():
+            inputs = tf.placeholder(
+                dtype=tf.float32, shape=(self._X_train.shape[1], self._X_train.shape[2]), name="serialized_example")
+
+            return tf.estimator.export.ServingInputReceiver(inputs, inputs)
+
+        self._estimator.export_saved_model(model_path, serving_input_fn)
                         
 
     def predict(self, target='test'):
