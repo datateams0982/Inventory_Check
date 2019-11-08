@@ -88,24 +88,24 @@
 
 * AutoML experiment: by-cluster normalize, all normalize
 * by-cluster: 
-    -acc on val: 61.8%
-    -acc on test: 65%
-    -variance on test: 0.036
-    -variance on val: 0.05
-    -ratio under 60% : 8% (test), 39%(val)
-    -threshold 0.6 precision (test): 71% (down 88926), 71% (up 63363)
-    -2017: 62%, 2018: 64%, 2019: 66%, 2017/09: 62%
-    -threshold 0.6 precision (val): 66% (down 35313), 71% (up 19175)
+    * acc on val: 61.8%
+    * acc on test: 65%
+    * variance on test: 0.036
+    * variance on val: 0.05
+    * ratio under 60% : 8% (test), 39%(val)
+    * threshold 0.6 precision (test): 71% (down 88926), 71% (up 63363)
+    * 2017: 62%, 2018: 64%, 2019: 66%, 2017/09: 62%
+    * threshold 0.6 precision (val): 66% (down 35313), 71% (up 19175)
     
  * Full:
-    -acc on val: 62.1%
-    -acc on test: 66%
-    -variance on test: 0.036
-    -variance on val: 0.05
-    -ratio under 60%: 4.6% (test), 32.6% (val)
-    -threshold 0.6 precision (test): 71% (down 35313), 72% (up 77231)
-    -2017: 63%, 2018: 64%, 2019: 68%, 2017/09: 62%
-    -threshold 0.6 precision (val):  66% (down 38320), 71% (up 23820)
+    * acc on val: 62.1%
+    * acc on test: 66%
+    * variance on test: 0.036
+    * variance on val: 0.05
+    * ratio under 60%: 4.6% (test), 32.6% (val)
+    * threshold 0.6 precision (test): 71% (down 35313), 72% (up 77231)
+    * 2017: 63%, 2018: 64%, 2019: 68%, 2017/09: 62%
+    * threshold 0.6 precision (val):  66% (down 38320), 71% (up 23820)
     
   * Check data correctness
   * Todo experiment: industry index normalize by industry, capital(?), total(?), remove cluster indicator
