@@ -106,8 +106,8 @@
     * ratio under 60% when threshold=0.6: 1.2% (test), 10.6%
     * Overall threshold 0.6 precision (test): 71% (down 98554/258857 = 38.1%), 72% (up 77231/258857 = 29.8%)
     * Overall threshold 0.6 precision (val):  66% (down 38214/110690 = 34.5%), 71% (up 23837/110690 = 21.5%)
-    * Annual threshold 0.6 precision (up): 2017: 71%, 2018: 68%, 2019: 75%, ~2017/09: 71%, 2016: 69%
-    * Annual threshold 0.6 precision (down): 2017: 67%, 2018: 72%, 2019: 71%, ~2017/09: 66%, 2016: 66%
+    * Annual threshold 0.6 precision (up): 2017: 71% (support 24.2%), 2018: 68% (support 27.1%), 2019: 75% (support 35.5%), ~2017/09: 71% (support 23.2%), 2016: 69% (support 16.3%)
+    * Annual threshold 0.6 precision (down): 2017: 67% (support 41.7%), 2018: 72% (support 41.5%), 2019: 71% (support 32.1%), ~2017/09: 66% (support 32.6%), 2016: 66% (support 40.7%)
     * Annual threshold 0.5 accuracy: 2017: 63.8%, 2018: 65.7%, 2019: 67.8%, ~2017/09: 62.4%, 2016: 61.2%
     * Annual threshold 0.6 accuracy: 2017: 68.3%, 2018: 70.3%, 2019: 72.9%, ~2017/09: 68.1%, 2016: 66.7% 
     
@@ -127,7 +127,7 @@
     * ratio under 60% when threshold=0.6: 1.6% (test), 9.3%
     * Overall threshold 0.6 precision (test): 71% (down 102620/258857 = 39.6%), 73% (up 74079/258857 = 28.6%)
     * Overall threshold 0.6 precision (val):  67% (down 35317/110690 = 31.9%), 73% (up 19409/110690 = 17.5%)
-    * Annual threshold 0.6 precision (up): 2017: 73%, 2018: 70%, 2019: 76%, ~2017/09: 73%, 2016: 70%
-    * Annual threshold 0.6 precision (down): 2017: 66%, 2018: 72%, 2019: 70%, ~2017/09: 67%, 2016: 67%
-    * Annual threshold 0.5 accuracy: 2017: 63.74%, 2018: 65.95%, 2019: 67.67%, ~2017/09: 62.5%, 2016: 61%
+    * Annual threshold 0.6 precision (up): 2017: 73% (support 21.9%), 2018: 70% (support 25.9%), 2019: 76% (support 34.6%), ~2017/09: 73% (support 18.3%), 2016: 70% (support 15.2%)
+    * Annual threshold 0.6 precision (down): 2017: 66% (support 44.8%), 2018: 72% (support 43.1%), 2019: 70% (support 33%), ~2017/09: 67% (support 31%), 2016: 67% (support 34.7%)
+    * Annual threshold 0.5 accuracy: 2017: 63.74%, 2018: 65.95%, 2019: 67.67%, ~2017/09: 62.5%, 2016: 61.1%
     * Annual threshold 0.6 accuracy: 2017: 68.3%, 2018: 71.2%, 2019: 73.1%, ~2017/09: 69.1%, 2016: 68.2% 
