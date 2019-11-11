@@ -98,15 +98,36 @@
     * threshold 0.6 precision (val): 66% (down 35313), 71% (up 19175)
     
  * Full:
-    * acc on val: 62.1%
-    * acc on test: 66%
-    * variance on test: 0.036
-    * variance on val: 0.05
-    * ratio under 60%: 4.6% (test), 32.6% (val)
-    * threshold 0.6 precision (test): 71% (down 98554), 72% (up 77231)
-    * 2017: 63%, 2018: 64%, 2019: 68%, 2017/09: 62%
-    * threshold 0.6 precision (val):  66% (down 38320), 71% (up 23820)
+    * acc on val: 62.09% (threshold 0.5), 67.75% (threshold 0.6)
+    * acc on test: 66.27% (threshold 0.5), 71.03% (threshold 0.6)
+    * variance on test: 0.0364
+    * variance on val: 0.051
+    * ratio under 60% when threshold=0.5: 4.6% (test), 32.76% (val)
+    * ratio under 60% when threshold=0.6: 1.2% (test), 10.6%
+    * Overall threshold 0.6 precision (test): 71% (down 98554/258857 = 38.1%), 72% (up 77231/258857 = 29.8%)
+    * Overall threshold 0.6 precision (val):  66% (down 38214/110690 = 34.5%), 71% (up 23837/110690 = 21.5%)
+    * Annual threshold 0.6 precision (up): 2017: 71%, 2018: 68%, 2019: 75%, ~2017/09: 71%, 2016: 69%
+    * Annual threshold 0.6 precision (down): 2017: 67%, 2018: 72%, 2019: 71%, ~2017/09: 66%, 2016: 66%
+    * Annual threshold 0.5 accuracy: 2017: 63.8%, 2018: 65.7%, 2019: 67.8%, ~2017/09: 62.4%, 2016: 61.2%
+    * Annual threshold 0.6 accuracy: 2017: 68.3%, 2018: 70.3%, 2019: 72.9%, ~2017/09: 68.1%, 2016: 66.7% 
     
   * Check data correctness
   * Todo experiment: industry index normalize by industry, capital(?), total(?), remove cluster indicator
   * Todo Developement: Evaluation Framework
+  
+# 2019/11/11
+
+* AutoML Experiment: all normalize without cluster, by-industry normalize industry index with capital & total
+* Full without cluster:
+    * acc on val: 62.15% (threshold 0.5), 68.87% (threshold 0.6)
+    * acc on test: 66.32% (threshold 0.5), 71.58% (threshold 0.6)
+    * variance on test: 0.037
+    * variance on val: 0.051
+    * ratio under 60% when threshold=0.5: 4.8% (test), 32.2% (val)
+    * ratio under 60% when threshold=0.6: 1.6% (test), 9.3%
+    * Overall threshold 0.6 precision (test): 71% (down 102620/258857 = 39.6%), 73% (up 74079/258857 = 28.6%)
+    * Overall threshold 0.6 precision (val):  67% (down 35317/110690 = 31.9%), 73% (up 19409/110690 = 17.5%)
+    * Annual threshold 0.6 precision (up): 2017: 73%, 2018: 70%, 2019: 76%, ~2017/09: 73%, 2016: 70%
+    * Annual threshold 0.6 precision (down): 2017: 66%, 2018: 72%, 2019: 70%, ~2017/09: 67%, 2016: 67%
+    * Annual threshold 0.5 accuracy: 2017: 63.74%, 2018: 65.95%, 2019: 67.67%, ~2017/09: 62.5%, 2016: 61%
+    * Annual threshold 0.6 accuracy: 2017: 68.3%, 2018: 71.2%, 2019: 73.1%, ~2017/09: 69.1%, 2016: 68.2% 
