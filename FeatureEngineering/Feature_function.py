@@ -2,24 +2,20 @@ import numpy as np
 import pandas as pd 
 import datetime
 from datetime import datetime, timedelta, date
-from sklearn.preprocessing import OneHotEncoder
-from tqdm import tqdm_notebook as tqdm
 from scipy.stats import skew, kurtosis
-from sklearn.preprocessing import MinMaxScaler
-import calendar
 import math
 import pywt 
 import copy
 
-#Compute True Range
+
 def TR(row):
     TR = max([(row["high"] - row["low"]), abs(row["high"] - row["close_lag"]), abs(row["close_lag"] - row["low"])])
     
     return TR
 
-
 #Compute RSI
 def RSI(df, n):  
+    df = df.reset_index(drop=True)
     i = 0  
     UpI = [0]  
     DoI = [0]  
@@ -40,201 +36,142 @@ def RSI(df, n):
     PosDI = pd.Series(UpI.ewm(span = n, min_periods = n - 1).mean())  
     NegDI = pd.Series(DoI.ewm(span = n, min_periods = n - 1).mean())  
 
-    RSI = pd.Series(PosDI / (PosDI + NegDI), name = 'RSI_' + str(n))  
-    RSI = RSI.fillna(0)
-    df = df.join(RSI)  
+    RSI = pd.Series(PosDI / (PosDI + NegDI), name = 'RSI_' + str(n) + '_week')  
+    RSI = RSI.replace([np.inf, -np.inf], np.nan)
+    RSI = RSI.fillna(0) 
+    df = df.join(RSI) 
 
     return df
 
 
 #Compute Stochastic Index
 def STO(df, nk, nD):  
-    SOk = pd.Series((df['close'] - df['low'].rolling(nk).min()) / (df['high'].rolling(nk).max() - df['low'].rolling(nk).min()), name = 'SO'+str(nk)) 
+    df = df.reset_index(drop=True)
+    SOk = pd.Series((df['close'] - df['low'].rolling(nk).min()) / (df['high'].rolling(nk).max() - df['low'].rolling(nk).min()), name = 'SOk'+str(nk)+'_week') 
+    SOk = SOk.replace([np.inf, -np.inf], np.nan)
     SOk = SOk.fillna(0)
-    SOd = pd.Series(SOk.ewm(ignore_na=False, span=nD, min_periods=nD-1, adjust=True).mean(), name = 'SO'+str(nD))
+    SOd = pd.Series(SOk.ewm(ignore_na=False, span=nD, min_periods=nD-1, adjust=True).mean(), name = 'SOd'+str(nD)+'_week')
     SOd = SOd.fillna(0)
     df = df.join(SOk)
     df = df.join(SOd)
     
     return df
 
-#Compute VWAP
-def VWAP(row):  
-    if row['vol'] == 0:
-        return 0
-    else:
-        vwap = row['total']/row['vol']
-        return vwap
 
-
-def price_volume_trend(row):
-
-    pvt = row['vol'] * (row['close'] - row['close_lag']) / row['close_lag']
-        
-    return pvt
-
-
-
-#Denoise
-def WT(index_list, wavefunc='db4', lv=4, m=1, n=4, plot=False):
-    
-    '''
-    WT: Wavelet Transformation Function
-    index_list: Input Sequence;
-   
-    lv: Decomposing Level；
- 
-    wavefunc: Function of Wavelet, 'db4' default；
-    
-    m, n: Level of Threshold Processing
-   
-    '''
-   
-    # Decomposing 
-    coeff = pywt.wavedec(index_list,wavefunc,mode='sym',level=lv)   #  Decomposing by levels，cD is the details coefficient
-    sgn = lambda x: 1 if x > 0 else -1 if x < 0 else 0 # sgn function 
-
-    # Denoising
-    # Soft Threshold Processing Method
-    for i in range(m,n+1):   #  Select m~n Levels of the wavelet coefficients，and no need to dispose the cA coefficients(approximation coefficients)
-        cD = coeff[i]
-        Tr = np.sqrt(2*np.log2(len(cD)))  # Compute Threshold
-        for j in range(len(cD)):
-            if cD[j] >= Tr:
-                coeff[i][j] = sgn(cD[j]) * (np.abs(cD[j]) -  Tr)  # Shrink to zero
-            else:
-                coeff[i][j] = 0   # Set to zero if smaller than threshold
-
-    # Reconstructing
-    coeffs = {}
-    for i in range(len(coeff)):
-        coeffs[i] = copy.deepcopy(coeff)
-        for j in range(len(coeff)):
-            if j != i:
-                coeffs[i][j] = np.zeros_like(coeff[j])
-    
-    for i in range(len(coeff)):
-        coeff[i] = pywt.waverec(coeffs[i], wavefunc)
-        if len(coeff[i]) > len(index_list):
-            coeff[i] = coeff[i][:-1]
-            
-    denoised_index = np.sum(coeff, axis=0)   
-        
-    if plot:     
-        data.plot(figsize=(10,5))
-        plt.title(f'Level_{lv}')
-   
-    return denoised_index
-
-
-
-def denoise_feature(data, columns_dict):
+def price_volume_trend(data):
 
     d = data.sort_values(by='ts').reset_index(drop=True)
-    d['origin_close'] = d['close']
-    d = d.sort_values(by='ts').reset_index(drop=True)
+    d['pvt_current'] = d['vol'] * (d['close'] - d['close_lag']) / d['close_lag']
 
-    denoise_level = [[1200, 3], [1800, 4], [4000, 5]]
+    for item in ['index_', 'industry_']:
+        d[f'{item}pvt_current'] = d[f'{item}vol'] * (d[f'{item}close'] - d[f'{item}close'].shift(1)) / d[f'{item}close'].shift(1)
 
-    index_col = columns_dict['index']
-    price_col = columns_dict['price']
-    vol_col = columns_dict['vol']
 
-    for item in denoise_level:
-        if len(d) == 0:
-            break
-        if len(d) <= item[0]:
-            level = item[1]
-            for col in index_col:
-                d[col] = WT(d[col], lv=level, n=level)
-            for price in price_col:
-                d[price] = WT(d[price], lv=level, n=level)
-            for vol in vol_col:    
-                d.loc[d[d[vol] != 0].index.tolist(), vol] = WT(d.loc[d[d[vol] != 0].index.tolist(), vol], lv=level, n=level)
-            break
-        else:
-            continue
+    feature = [f'{item}pvt_current' for item in ['index_', 'industry_', '']]
+    pvt_feature = [f'{item}pvt_week' for item in ['index_', 'industry_', '']]
+    
+    for f in pvt_feature:
+        d[f] = 0
 
+    d.loc[:, pvt_feature] = d.loc[:, feature].rolling(window=20).sum().values
+
+    d = d.drop(columns=feature)
 
     return d
 
 
 
+def index_slope(row, problem='close'):
 
-##Compute Technical Indicators    
-def get_technical_indicators(data, columns_dict, SplitDate=date(2017,9,1), denoise=True):
-    data = data.reset_index(drop=True).sort_values(by='ts')
+    if problem == 'close':
+        slope = row['return'] - row['index_return']
+    else:
+        slope = row['VWAP_return'] - row['index_return']
 
-    data['VWAP'] = data.apply(VWAP, axis=1)
-       
+    return slope
 
-    if denoise:
-        d1 = data[data['ts'] < SplitDate].reset_index(drop=True)
-        d2 = data[data['ts'] >= SplitDate].reset_index(drop=True)
-        if len(d1) > 0:
-            d1 = denoise_feature(d1, columns_dict)
-            d2 = denoise_feature(d2, columns_dict)
-            dataset = pd.concat([d1, d2], axis=0).reset_index(drop=True).sort_values(by='ts')
+def industry_slope(row, problem='close'):
 
+    if problem == 'close':
+        slope = row['return'] - row['industry_return']
+    else:
+        slope = row['VWAP_return'] - row['industry_return']
+
+    return slope
+
+
+def label(row):
+
+    if row['VWAP_after'] - row['close'] > 0:
+        return 1
+    elif row['VWAP_after'] - row['close'] <= 0:
+        return 0
+
+
+def log_return(row, problem='close'):
+
+    assert problem in ['close', 'VWAP', 'index', 'industry']
+
+    if problem == 'close':
+        result = ((row['close'] - row['close_lag']) / row['close_lag']) * 100
+        
+    elif problem == 'VWAP':
+        if row['VWAP_lag'] == 0:
+            result = 0
         else:
-            dataset = denoise_feature(d2, columns_dict)
-       
+            result = ((row['VWAP'] - row['VWAP_lag']) / row['VWAP_lag']) * 100
+
+    elif problem == 'index':
+        result = ((row['index_close'] - row['index_close_lag']) / row['index_close_lag']) * 100
     
-    dataset['close_lag'] = dataset['close'].shift(1)
-    # Create 7 and 21 days Moving Average
-    dataset['ma7'] = dataset['close'].rolling(window=7).mean()
-    dataset['ma21'] = dataset['close'].rolling(window=21).mean()
+    else:
+        result = ((row['industry_close'] - row['industry_close_lag']) / row['industry_close_lag']) * 100
+
+    result = round(result, 2)
+
+    return result
+
+
+def get_technical_indicators(data, columns_dict, look_back=4, forward=1):
+
+    d = data.sort_values(by='ts').reset_index(drop=True)
+    lag = columns_dict['lag']
+    for col in lag:
+        d[f'{col}_lag'] = d[col].shift(1)
+
+    d['VWAP_after'] = d['VWAP'].shift(-forward)
+    d['Y_weekly'] = d.apply(label, axis=1)
+
+    return_col = columns_dict['return']
+    for col in return_col:
+        d[f'{col}_return'] = d.apply(log_return, problem=col, axis=1)
+
     
-    # Create MACD
-    dataset['ema26'] = dataset['close'].ewm(span=26, min_periods=25).mean()
-    dataset['ema12'] = dataset['close'].ewm(span=12, min_periods=11).mean()
-    dataset['MACD'] = (dataset['ema12']-dataset['ema26'])
-    # Create Bollinger Bands
-    dataset['20sd'] = dataset['close'].rolling(window=20).std()
-    dataset['upper_band'] = dataset['ma21'] + (dataset['20sd']*2)
-    dataset['lower_band'] = dataset['ma21'] - (dataset['20sd']*2)
+    d[f'sd_{look_back}'] = d['VWAP'].rolling(window=look_back).std()/d['VWAP'].rolling(window=look_back).mean()
 
-    corr_col = columns_dict['corr']
-    for col in corr_col:
-        dataset[f'{col}_corr'] = dataset['close'].rolling(20).corr(dataset[col])
+    for problem in ['VWAP', 'close']:
+        d[f'index_{problem}_slope'] = d.apply(index_slope, problem=problem, axis=1)
+        d[f'industry_{problem}_slope'] = d.apply(industry_slope, problem=problem, axis=1)
+
     
-    #Compute skewness and kurtosis
-    skew_col = columns_dict['moment']
-    for col in skew_col:
-        dataset[f'{col}_skew'] = dataset[col].rolling(window=20).apply(lambda x: skew(x))
-        dataset[f'{col}_kurtosis'] = dataset[col].rolling(window=20).apply(lambda x: kurtosis(x))
-
-    #Compute PVT
-    dataset['pvt_current'] = dataset.apply(price_volume_trend, axis=1)
-    dataset['pvt'] = dataset['pvt_current'] + dataset['pvt_current'].shift(1)
+    d['TR'] = d.apply(TR, axis=1)
+    d['ATR_weekly'] = d['TR'].ewm(span=look_back, min_periods=look_back-1).mean()
     
-    # Create True Range
-    dataset['TR'] = dataset.apply(TR, axis=1)
-    dataset['ATR'] = dataset['TR'].ewm(span=15).mean()
+           
+    d = price_volume_trend(d)    
+    d = RSI(d, n=look_back)
+    d = STO(d, nk=4, nD=1)
+    d = d.replace([np.inf, -np.inf], 0)
+    d = d[d.ts.dt.date < date(2019,9,23)]
 
-    price_col = columns_dict['price'] + columns_dict['index']
-    for col in price_col:
-        dataset.loc[dataset[dataset[col] < 0].index.tolist(), col] = 0
-    
-    # Create Reletive Strength Index
-    dataset = RSI(dataset, n=15)
-    
-    # Create Stochastic Oscillator
-    dataset = STO(dataset, nk=5, nD=3)
+    d = d.drop(columns=['TR', 'VWAP_lag', 'VWAP_after', 'close_lag', 'index_close_lag', 'industry_close_lag'])
 
-    dataset = dataset.drop(columns=['20sd', 'close_lag'])
-
-    return dataset
+    return d
 
 
+def merge_daily(daily_data, weekly_data, weekly_feature):
 
-def validation_split(X_train, Y_train, step=20):
-    length = len(X_train)//step
-    val_index = [(step * i) - 1 for i in range(1, length + 1, 1)]
-    train_index = [i for i in range(len(X_train)) if i%step != step-1]
-    valX = [X_train[i] for i in val_index]
-    trainX = [X_train[i] for i in train_index]
-    valY = [Y_train[i] for i in val_index]
-    trainY = [Y_train[i] for i in train_index]
-    
-    return trainX, trainY, valX, valY  
+    d = weekly_data[weekly_feature]
+    df = pd.merge(d, daily_data, on=['ts', 'StockNo'], how='inner')
+
+    return df

@@ -31,15 +31,15 @@ class Input_generator:
             self._Y_test = self._df[5]
 
         else:
-            with open(f'{df_path}Whole_classification_minmax0_Weekly_train', 'rb') as fp:
+            with open(f'{df_path}Whole_classification_minmax0_Weekly_train_new', 'rb') as fp:
                 df = pickle.load(fp)
             self._X_train = np.array(df[0]).astype(np.float32)
             self._Y_train = df[1]
-            with open(f'{df_path}Whole_classification_minmax0_Weekly_val', 'rb') as fp:
+            with open(f'{df_path}Whole_classification_minmax0_Weekly_val_new', 'rb') as fp:
                 df = pickle.load(fp)
             self._X_val = np.array(df[0]).astype(np.float32)
             self._Y_val = df[1]
-            with open(f'{df_path}Whole_classification_minmax0_Weekly_test', 'rb') as fp:
+            with open(f'{df_path}Whole_classification_minmax0_Weekly_test_new', 'rb') as fp:
                 df = pickle.load(fp)
             self._X_test = np.array(df[0]).astype(np.float32)
             self._Y_test = df[1]
@@ -406,28 +406,30 @@ class Generator(adanet.subnetwork.Generator):
         new_conv_neuron = [item+16*conv_iter_round for item in self._param['conv_neuron']]
         new_dense_neuron_CNN = [item+16*conv_iter_round for item in self._param['dense_neuron_CNN']]
         new_dense_neuron = [item+8*iter_round for item in self._param['dense_neuron']]
-        
-        if all_mod == 0:
-            new_conv_layer = 1
-            new_dropout_CNN = [min(0.05*conv_iter_round, 0.3) for item in self._param['dropout_CNN']]
-            new_dense_layer_CNN = 1    
-                             
-        elif all_mod == 4:
-            new_conv_layer = 1
-            new_dropout_CNN = [min(0.05*conv_iter_round, 0.3) for item in self._param['dropout_CNN']]
-            new_dense_layer_CNN = 2
 
+        if conv_mod == 0:
+            new_conv_layer = 4
         else:
             new_conv_layer = conv_mod
+
+        if (all_mod > 4) or all_mod == 0:
+            new_dense_layer_CNN = 2
+        else:
+            new_dense_layer_CNN = 1
+        
+        if all_mod == 1:
+            new_dropout_CNN = [min(0.05*conv_iter_round, 0.3) for item in self._param['dropout_CNN']]
+                  
+        elif all_mod == 5:
+            new_dropout_CNN = [min(0.05*conv_iter_round, 0.3) for item in self._param['dropout_CNN']]
+
+        else:
             new_dropout_CNN = [min(0.05*conv_iter_round + 0.05*(conv_mod-1), 0.3) for item in self._param['dropout_CNN']]
-            if all_mod > 4:
-                new_dense_layer_CNN = 2
-            else:
-                new_dense_layer_CNN = 1
+
                 
         if mod == 0:
             new_dropout = [min(0.05*iter_round, 0.3) for item in self._param['dropout']]
-            new_dense_layer = 1            
+            new_dense_layer = 4            
 
         else:
             new_dense_layer = mod

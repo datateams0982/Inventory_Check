@@ -16,7 +16,7 @@ def main():
 
     results = pd.DataFrame(columns = ['auc', 'acc', 'balance_acc', 'balance_auc'], index = ['train', 'val', 'test'])
 
-    classifier = Adanet.Train_adanet(df_path=path, cluster_num=cluster_num, ada_steps=200, epoch=2000, batch_size=256, config_name='trial_1', penalty=0.003)
+    classifier = Adanet.Train_adanet(df_path=path, cluster_num=cluster_num, ada_steps=200, epoch=6000, batch_size=256, config_name='trial_1', penalty=0.003)
 
     classifier.CNN_train()
 

@@ -1,0 +1,17 @@
+digraph Tree {
+node [shape=box, style="filled, rounded", color="black", fontname=helvetica] ;
+edge [fontname=helvetica] ;
+0 [label="foreign_buy_continuous <= 0.5\ngini = 0.5\nsamples = 571534\nvalue = [459623, 444606]\nclass = down", fillcolor="#fefbf9"] ;
+1 [label="foreign_buy_buy_day_ratio <= 0.43\ngini = 0.49\nsamples = 286888\nvalue = [256354, 197527]\nclass = down", fillcolor="#f9e2d2"] ;
+0 -> 1 [labeldistance=2.5, labelangle=45, headlabel="True"] ;
+2 [label="gini = 0.49\nsamples = 152687\nvalue = [133502, 108295]\nclass = down", fillcolor="#fae7da"] ;
+1 -> 2 ;
+3 [label="gini = 0.49\nsamples = 134201\nvalue = [122852, 89232]\nclass = down", fillcolor="#f8ddc9"] ;
+1 -> 3 ;
+4 [label="foreign_buy_sell_day_ratio <= 0.43\ngini = 0.5\nsamples = 284646\nvalue = [203269, 247079]\nclass = up", fillcolor="#dceefa"] ;
+0 -> 4 [labeldistance=2.5, labelangle=-45, headlabel="False"] ;
+5 [label="gini = 0.5\nsamples = 167452\nvalue = [122953, 142370]\nclass = up", fillcolor="#e4f2fb"] ;
+4 -> 5 ;
+6 [label="gini = 0.49\nsamples = 117194\nvalue = [80316, 104709]\nclass = up", fillcolor="#d1e8f9"] ;
+4 -> 6 ;
+}
