@@ -9,9 +9,10 @@ import calendar
 import math
 import pymssql as mssql
 import time
+from retry import retry
 
 #Send query to NsSQL
-def send_query(query, db = 'OpenData', timecost = True, showcol = True, showlen = True):
+def send_query(query):
     
     key = b'yFn37HvhJN2XPrV61AIk8eOG8MJw0lBXP2r32CJaPmk='
     cipher_suite = Fernet(key)
@@ -19,7 +20,6 @@ def send_query(query, db = 'OpenData', timecost = True, showcol = True, showlen 
         for line in file_object:
             encryptedpwd = line
     
-    tStart = time.time()
     ods = mssql.connect(host = '128.110.13.89', 
                       user = 'OpenData', 
                       password = bytes(cipher_suite.decrypt(encryptedpwd)).decode("utf-8"), 
@@ -28,18 +28,11 @@ def send_query(query, db = 'OpenData', timecost = True, showcol = True, showlen 
     odscur = ods.cursor(as_dict = True)
     odscur.execute(query)
     temp = odscur.fetchall()
+    row_count = int(odscur.rowcount)
     df = pd.DataFrame(temp)
     odscur.close()
-    tEnd = time.time()
 
-    if timecost == True:
-        print("It cost %f sec" % (tEnd - tStart))
-    if showlen == True:
-        print('Data length:', len(df))
-    if showcol == True:
-        print(df.columns)
-
-    return df
+    return df, row_count
 
 
 
@@ -50,8 +43,21 @@ def VWAP(row):
         vwap = row['total']/row['vol']
         
         return vwap
-    
+
+@retry(Exception, tries=4, delay=300)    
 def stock_query(end_date):
+
+    precheck_query = f'''SELECT 
+                            MAX([DATE]) as max_date
+                        FROM OpenData.dbo.CMONEY_DAILY_CLOSE
+                        '''
+
+    max_date, _ = send_query(precheck_query)
+    max_date = max_date['max_date'].iloc[0]
+    max_date = datetime.strptime(str(max_date)[:4] + '-' + str(max_date)[4:6] + '-' + str(max_date)[6:], '%Y-%m-%d').date()
+
+    if max_date < end_date:
+        raise Exception('Data Not Updated')
     
     start_date = (end_date - timedelta(days=150)).strftime('%Y%m%d')
     year = end_date.year
@@ -240,7 +246,11 @@ def stock_query(end_date):
                             ON price.StockNo = reduction.STOCK_ID AND price.ts = reduction.START_TRADE_DATE
                         '''
     
-    stock_df = send_query(stock_subquery, timecost = False, showcol = False, showlen = False)
+    stock_df, stock_row = send_query(stock_subquery)
+
+    if len(stock_df) != stock_row:
+        raise Exception("Stock data length doesn't match")
+
     stock_df['VWAP'] = stock_df.apply(VWAP, axis=1)
     stock_df['VWAP'] = round(stock_df['VWAP'].astype(np.float64), 4)
     stock_df['ts'] = stock_df['ts'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
@@ -258,7 +268,7 @@ def stock_query(end_date):
                         FROM OpenData.dbo.CMONEY_DAILY_CLOSE
                         WHERE 
                             STOCK_ID = 'TWA00' 
-                            AND DATE <= {end_date} and DATE >= {start_date}
+                            AND DATE BETWEEN {start_date} and {end_date}
                         '''
     
     industry_subquery = f'''SELECT [DATE] AS ts,
@@ -271,12 +281,19 @@ def stock_query(end_date):
                         FROM OpenData.dbo.CMONEY_DAILY_CLOSE
                         WHERE 
                             SUBSTRING(STOCK_ID,1,3) = 'TWB' 
-                            AND DATE <= {end_date} and DATE >= {start_date}
+                            AND DATE BETWEEN {start_date} and {end_date}
                         '''
     
-    index_df = send_query(index_subquery, timecost = False, showcol = False, showlen = False)
+    index_df, index_row = send_query(index_subquery)
+    if len(index_df) != index_row:
+        raise Exception("Index data length doesn't match")
+
     index_df['ts'] = index_df['ts'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
-    industry_df = send_query(industry_subquery, timecost = False, showcol = False, showlen = False)
+
+    industry_df, industry_row= send_query(industry_subquery)
+    if len(industry_df) != industry_row:
+        raise Exception("Index data length doesn't match")
+
     industry_df['ts'] = industry_df['ts'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
     index_df['ts'] = pd.to_datetime(index_df['ts'])
     industry_df['ts'] = pd.to_datetime(industry_df['ts'])
@@ -351,11 +368,3 @@ def merge_index(data, index, industry_index):
     df = df.drop(columns=['reference'])
 
     return df
-    
-    
-    
-
-
-
-
-
