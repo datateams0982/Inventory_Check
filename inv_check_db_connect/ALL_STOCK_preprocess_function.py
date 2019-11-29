@@ -14,9 +14,16 @@ from retry import retry
 #Send query to NsSQL
 def send_query(query):
     
+    '''
+    Function sending query to ODS
+    '''
+    encoding_path = os.path.join(os.sep, 'config', 'mssqltip_bytes.bin')
+    if not os.path.exists(encoding_path):
+        raise Exception(f'Encoding Document not in this directory: {encoding_path}')
+
     key = b'yFn37HvhJN2XPrV61AIk8eOG8MJw0lBXP2r32CJaPmk='
     cipher_suite = Fernet(key)
-    with open('config/mssqltip_bytes.bin', 'rb') as file_object:
+    with open(encoding_path, 'rb') as file_object:
         for line in file_object:
             encryptedpwd = line
     
@@ -44,6 +51,7 @@ def VWAP(row):
         
         return vwap
 
+
 @retry(Exception, tries=4, delay=300)    
 def stock_query(end_date):
 
@@ -56,7 +64,7 @@ def stock_query(end_date):
     max_date = max_date['max_date'].iloc[0]
     max_date = datetime.strptime(str(max_date)[:4] + '-' + str(max_date)[4:6] + '-' + str(max_date)[6:], '%Y-%m-%d').date()
 
-    if max_date < end_date:
+    if max_date != end_date:
         raise Exception('Data Not Updated')
     
     start_date = (end_date - timedelta(days=150)).strftime('%Y%m%d')
@@ -68,6 +76,7 @@ def stock_query(end_date):
     else:
         last_year = year
         last_month = month - 1
+
     last_month_start = date(last_year, last_month, 1).strftime('%Y%m%d')
     last_month_end = date(last_year, last_month, calendar.monthrange(last_year, last_month)[1]).strftime('%Y%m%d')
     end_date = end_date.strftime('%Y%m%d')
@@ -268,7 +277,7 @@ def stock_query(end_date):
                         FROM OpenData.dbo.CMONEY_DAILY_CLOSE
                         WHERE 
                             STOCK_ID = 'TWA00' 
-                            AND DATE BETWEEN {start_date} and {end_date}
+                            AND DATE <= {end_date} and DATE >= {start_date}
                         '''
     
     industry_subquery = f'''SELECT [DATE] AS ts,
@@ -281,7 +290,7 @@ def stock_query(end_date):
                         FROM OpenData.dbo.CMONEY_DAILY_CLOSE
                         WHERE 
                             SUBSTRING(STOCK_ID,1,3) = 'TWB' 
-                            AND DATE BETWEEN {start_date} and {end_date}
+                            AND DATE <= {end_date} and DATE >= {start_date}
                         '''
     
     index_df, index_row = send_query(index_subquery)
@@ -368,3 +377,11 @@ def merge_index(data, index, industry_index):
     df = df.drop(columns=['reference'])
 
     return df
+    
+    
+    
+
+
+
+
+

@@ -1,27 +1,59 @@
 import numpy as np 
 import pandas as pd 
-from cryptography.fernet import Fernet
 from datetime import datetime, date, timedelta
 from tqdm import tqdm_notebook as tqdm
 import os
 import pymssql as mssql
 import calendar
-import time
-from multiprocessing import Pool    
-from functools import partial
-import requests
-import os    
 import json
+from multiprocessing import Pool    
+from functools import partial 
+import logging, traceback
 
-import ALL_STOCK_preprocess_function as func
-import VWAP_feature_function_rolling_week as func1
+import ALL_STOCK_preprocess_function as preprocess
+import VWAP_feature_function_rolling_week as FeatureEngineering
+import Prediction as Predict
+
+
+
+ct8 = datetime.utcnow() + timedelta(hours=8)
+
+logger = logging.getLogger()
+logger.setLevel(logging.NOTSET)
+
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s: - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S')
+
+log_path = os.path.join(os.sep, 'D:' + os.sep, '庫存健診開發', 'logging', f'log_{date.today()}.txt')
+if not os.path.exists(log_path):
+    with open(log_path, 'a'):
+        os.utime(log_path, None)
+
+fh = logging.FileHandler(log_path)
+fh.setLevel(logging.WARNING)
+fh.setFormatter(formatter)
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.WARNING)
+ch.setFormatter(formatter)
+
+logger.addHandler(ch)
+logger.addHandler(fh)
 
 
 def main():
 
     #Read data from DB
-    end_date = date.today()
-    d = func.stock_query(end_date)
+    end_date = date(2019,11,28)
+
+    logging.warning(f"Query Data From ODS.Opendata at {end_date}")
+    try:
+        d = preprocess.stock_query(end_date)
+    except:
+        logging.warning(f'Query Failed \n {traceback.format_exc()}')
+        raise Exception('Query Error')
+
     stock, index, industry_index = d[0], d[1], d[2]
 
 
@@ -31,13 +63,20 @@ def main():
     timedf = timedf.sort_values(by='ts')
     output_list = []
 
-    if __name__ == '__main__':
-        with Pool(processes=5) as pool:
-            for ___, x in enumerate(tqdm(pool.imap_unordered(partial(func.FillMissingTime, timedf=timedf, end_date=end_date), df_list), total=len(df_list)), 1):
-                    if x[0]:
-                        output_list.append(x[1])
-                    else:
-                        continue
+
+    logging.warning(f"Filling Missing Time at {end_date}")
+    try:
+        if __name__ == '__main__':
+            with Pool(processes=5) as pool:
+                for x in pool.imap_unordered(partial(preprocess.FillMissingTime, timedf=timedf, end_date=end_date), df_list):
+                        if x[0]:
+                            output_list.append(x[1])
+                        else:
+                            continue
+
+    except:
+        logging.warning(f'Failed when filling missing time \n {traceback.format_exc()}')
+        raise Exception('Filling Time Error')
 
     df = pd.concat(output_list)
 
@@ -46,48 +85,86 @@ def main():
     df_list = [group[1] for group in df.groupby(df['StockNo'])]
     output_list = []
 
-    if __name__ == '__main__':
-        with Pool(processes=5) as pool:
-            for ___, x in enumerate(tqdm(pool.imap_unordered(partial(func.merge_index, index=index, industry_index=industry_index), df_list), total=len(df_list)), 1):
-                    output_list.append(x)
+    logging.warning(f'Merging Stock Data with Index Data at {end_date}')
+    try:
+        if __name__ == '__main__':
+            with Pool(processes=5) as pool:
+                for x in pool.imap_unordered(partial(preprocess.merge_index, index=index, industry_index=industry_index), df_list):
+                        output_list.append(x)
+    
+        df = pd.concat(output_list)
 
-    df = pd.concat(output_list)
+    except:
+        logging.warning(f'Failed when merging index data \n {traceback.format_exc()}')
+        raise Exception('Merging Index Error')
 
+
+
+    #Reading column dict
+    column_dict_path = 'columns_dict.json'
+
+    if not os.path.exists(column_dict_path):
+        logging.warning(f'Failed when Reading Column Dict \n Column Dict not in this Directory: {column_dict_path}')
+        raise Exception(f'Column Dict not in this Directory: {column_dict_path}')
+        
+    with open(column_dict_path, 'r') as fp:
+        columns_dict = json.load(fp)
 
     #Feature Engineering
-    columns_dict = {'lag': ['index_close', 'industry_close', 'close', 'VWAP', 'VWAP_day5'],
-            'return': ['index', 'industry', 'close', 'VWAP', 'VWAP_day5'],
-            'ratio': ['index_close', 'index_vol', 'index_return', 'industry_close', 'industry_vol', 'industry_return', 'VWAP_return', 'close_return', 'vol', 'VWAP', 'VWAP_day5', 'VWAP_day5_return'],
-            'momentum': ['index_close', 'index_vol', 'index_return', 'industry_close', 'industry_vol', 'industry_return', 'VWAP_return', 'close_return', 'vol', 'VWAP', 'VWAP_day5', 'VWAP_day5_return'],
-            'moment': ['index_close', 'index_vol', 'industry_close', 'industry_vol', 'vol', 'VWAP', 'VWAP_day5', 'VWAP_day5_return'],
-            'buyer': ['foreign_buy', 'investment_buy', 'dealer_buy']
-            }
-
     df_list = [group[1] for group in df.groupby(df['StockNo'])]
     output_list = []
 
-    if __name__ == '__main__':
-        with Pool(processes=5) as pool:
-            for ___, x in enumerate(tqdm(pool.imap_unordered(partial(func1.get_technical_indicators, columns_dict=columns_dict), df_list), total=len(df_list)), 1):
-                output_list.append(x)
+    logging.warning(f'Feature Engineering at {end_date}')
+    try:
+        if __name__ == '__main__':
+            with Pool(processes=5) as pool:
+                for x in pool.imap_unordered(partial(FeatureEngineering.get_technical_indicators, columns_dict=columns_dict), df_list):
+                    output_list.append(x)
+
+    except:
+        logging.warning(f'Failed when Feature Engineering \n {traceback.format_exc()}')
+        raise Exception('Feature Engineering Error')
 
     df = pd.concat(output_list, axis=0)  
 
-    #Get today's feature  
+    #Reading Feature List
+    feature_dict_path = 'feature_dict.json'
+
+    if not os.path.exists(feature_dict_path):
+        logging.warning(f'Failed when Reading Feature Dict \n Feature Dict not in this Directory: {feature_dict_path}')
+        raise Exception(f'Feature Dict not in this Directory: {feature_dict_path}')
+        
+    feature = FeatureEngineering.read_feature_list(feature_dict_path, requirement='whole')
     df_last = df[df.ts.dt.date == end_date]
-    feature = func1.read_feature_list('D:\\庫存健診開發\\feature_dict.json', requirement='whole')
     feature_df = df_last[feature]
+
 
     #prediction
     results=[]
-    for i in tqdm(range(len(feature_df))):
-        this_df = feature_df.iloc[[i]]
-        result = func1.prediction(this_df)
-        results.append(result)
+
+    logging.warning(f'Predicting at {end_date}')
+    try:
+        feature_df['ts'] = feature_df['ts'].astype(str)
+        for i in range(len(feature_df)):
+            this_df = feature_df.iloc[[i]]
+            result = Predict.prediction(this_df)
+            results.append(result)
+    except:
+        logging.warning(f'Failed when Predicting \n {traceback.format_exc()}')
+        raise Exception('Predicting Error')
 
     result_df = pd.DataFrame(results, columns=['StockNo','ts','Y_0_score','Y_1_score'])
-    print(result_df)
+    
 
+    #Reading Encoding File
+    try:
+        Predict.write_to_db(result_df, f'PREDICTION_{end_date}')    
+    except:
+        logging.warning(f'Failed when Writing Prediction to Database \n {traceback.format_exc()}')
+        raise Exception('Writing to Database Error')
+
+    
+    return
 
 if __name__ == '__main__':
     main()
