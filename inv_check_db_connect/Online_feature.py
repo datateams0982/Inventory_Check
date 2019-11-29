@@ -97,7 +97,6 @@ def main():
         raise Exception('Merging Index Error')
 
 
-
     #Reading column dict
     column_dict_path = 'columns_dict.json'
 
@@ -124,6 +123,7 @@ def main():
         raise Exception('Feature Engineering Error')
 
     df = pd.concat(output_list, axis=0)  
+
 
     #Reading Feature List
     feature_dict_path = 'feature_dict.json'
@@ -159,7 +159,7 @@ def main():
         Predict.write_to_db(result_df, f'PREDICTION_{end_date}')    
     except:
         logging.error(f'Failed when Writing Prediction to Database \n {traceback.format_exc()}')
-        raise Exception('Writing to Database Error')
+        raise Exception('Write to Database Error')
 
     
     return

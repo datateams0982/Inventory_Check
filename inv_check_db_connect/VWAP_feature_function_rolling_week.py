@@ -5,17 +5,6 @@ from datetime import datetime, timedelta, date
 from scipy.stats import skew, kurtosis
 import math
 import json   
-# import pywt 
-# import copy
-
-
-# def TR(row):
-#     '''
-#     Compute True Range
-#     '''
-#     TR = max([(row["high"] - row["low"]), abs(row["high"] - row["VWAP_lag"]), abs(row["VWAP_lag"] - row["low"])])
-    
-#     return TR
 
 
 def RSI(df, rolling_window): 
@@ -307,12 +296,6 @@ def get_technical_indicators(data, columns_dict, look_back=15, forward=5):
     d[f'VWAP_day{forward}_return_{forward}'] = d.apply(log_return, problem=f'VWAP_day{forward}', axis=1)
 
 
-    # d['ema_20'] = d['VWAP'].ewm(span=20, min_periods=19).mean()
-    # d['ema_5'] = d['VWAP'].ewm(span=5, min_periods=4).mean()
-    # d['MACD'] = d['ema_5'] - d['ema_20']
-    # d['signal'] = d['MACD'].ewm(span=15, min_periods=14).mean()
-    # d['MACD_diff'] = d['MACD'] - d['signal']
-
     # Calculate slope
     for problem in ['VWAP', 'close', f'VWAP_day{forward}']:
         d[f'index_{problem}_slope'] = d.apply(index_slope, problem=problem, forward=forward, axis=1)
@@ -361,9 +344,6 @@ def get_technical_indicators(data, columns_dict, look_back=15, forward=5):
         d[f'{buy}_buy_day_ratio'] = d[f'{buy}_buy_indicator'].rolling(window=look_back).sum() / 15
         d[f'{buy}_sell_day_ratio'] = d[f'{buy}_sell_indicator'].rolling(window=look_back).sum() / 15
 
-    
-    # d['TR'] = d.apply(TR, axis=1)
-    # d['ATR'] = d['TR'].ewm(span=look_back, min_periods=look_back-1).mean()
     
     # Calculate other technical indicators       
     d = price_volume_trend(d)    

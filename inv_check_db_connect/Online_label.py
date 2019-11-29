@@ -50,17 +50,17 @@ def stock_query(start_date, end_date):
                     CASE WHEN FUT_VWAP_5D > PAST_VWAP_5D THEN 1 ELSE 0 END AS Y 
                 FROM(
                     SELECT 
-                    STOCK_ID AS StockNo,  
-                    DATE AS ts, 
-                    CASE WHEN PAST_VOLUME_5D = 0 THEN 0 ELSE PAST_AMT_5D/PAST_VOLUME_5D END as PAST_VWAP_5D, 
-                    CASE WHEN FUT_VOLUME_5D = 0 THEN 0 ELSE FUT_AMT_5D/FUT_VOLUME_5D END as FUT_VWAP_5D
+                    [STOCK_ID] AS StockNo,  
+                    [DATE] AS ts, 
+                    CASE WHEN PAST_VOLUME_5D = 0 THEN 0 ELSE PAST_AMT_5D/PAST_VOLUME_5D END AS PAST_VWAP_5D, 
+                    CASE WHEN FUT_VOLUME_5D = 0 THEN 0 ELSE FUT_AMT_5D/FUT_VOLUME_5D END AS FUT_VWAP_5D
                     FROM
                     (
                         SELECT x.*,
-                            SUM(VOLUME) over(partition by STOCK_ID order by STOCK_ID, DATE ROWS between 4 preceding and current row) as PAST_VOLUME_5D,
-                            SUM(AMOUNT) over(partition by STOCK_ID order by STOCK_ID, DATE ROWS between 4 preceding and current row) as PAST_AMT_5D,
-                            SUM(VOLUME) over(partition by STOCK_ID order by STOCK_ID, DATE ROWS between 1 following and 5 following) as FUT_VOLUME_5D,
-                            SUM(AMOUNT) over(partition by STOCK_ID order by STOCK_ID, DATE ROWS between 1 following and 5 following) as FUT_AMT_5D
+                            SUM(VOLUME) OVER(PARTITION BY [STOCK_ID] ORDER BY [STOCK_ID], [DATE] ROWS BETWEEN 4 PRECEDING AND CURRENT ROW) AS PAST_VOLUME_5D,
+                            SUM(AMOUNT) OVER(partition by STOCK_ID order by STOCK_ID, DATE ROWS between 4 preceding and current row) as PAST_AMT_5D,
+                            SUM(VOLUME) OVER(partition by STOCK_ID order by STOCK_ID, DATE ROWS between 1 following and 5 following) as FUT_VOLUME_5D,
+                            SUM(AMOUNT) OVER(partition by STOCK_ID order by STOCK_ID, DATE ROWS between 1 following and 5 following) as FUT_AMT_5D
                         FROM (
                                     SELECT 
                                     i.DATE as [DATE],
