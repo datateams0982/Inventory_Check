@@ -15,9 +15,7 @@ import VWAP_feature_function_rolling_week as FeatureEngineering
 import Prediction as Predict
 
 
-
-ct8 = datetime.utcnow() + timedelta(hours=8)
-
+# Logging Setting
 logger = logging.getLogger()
 logger.setLevel(logging.NOTSET)
 
@@ -31,11 +29,11 @@ if not os.path.exists(log_path):
         os.utime(log_path, None)
 
 fh = logging.FileHandler(log_path)
-fh.setLevel(logging.WARNING)
+fh.setLevel(logging.INFO)
 fh.setFormatter(formatter)
 
 ch = logging.StreamHandler()
-ch.setLevel(logging.WARNING)
+ch.setLevel(logging.INFO)
 ch.setFormatter(formatter)
 
 logger.addHandler(ch)
@@ -47,11 +45,11 @@ def main():
     #Read data from DB
     end_date = date(2019,11,28)
 
-    logging.warning(f"Query Data From ODS.Opendata at {end_date}")
+    logging.info(f"Query Data From ODS.Opendata at {end_date}")
     try:
         d = preprocess.stock_query(end_date)
     except:
-        logging.warning(f'Query Failed \n {traceback.format_exc()}')
+        logging.error(f'Query Failed \n {traceback.format_exc()}')
         raise Exception('Query Error')
 
     stock, index, industry_index = d[0], d[1], d[2]
@@ -64,7 +62,7 @@ def main():
     output_list = []
 
 
-    logging.warning(f"Filling Missing Time at {end_date}")
+    logging.info(f"Filling Missing Time at {end_date}")
     try:
         if __name__ == '__main__':
             with Pool(processes=5) as pool:
@@ -75,7 +73,7 @@ def main():
                             continue
 
     except:
-        logging.warning(f'Failed when filling missing time \n {traceback.format_exc()}')
+        logging.error(f'Failed when filling missing time \n {traceback.format_exc()}')
         raise Exception('Filling Time Error')
 
     df = pd.concat(output_list)
@@ -85,7 +83,7 @@ def main():
     df_list = [group[1] for group in df.groupby(df['StockNo'])]
     output_list = []
 
-    logging.warning(f'Merging Stock Data with Index Data at {end_date}')
+    logging.info(f'Merging Stock Data with Index Data at {end_date}')
     try:
         if __name__ == '__main__':
             with Pool(processes=5) as pool:
@@ -95,7 +93,7 @@ def main():
         df = pd.concat(output_list)
 
     except:
-        logging.warning(f'Failed when merging index data \n {traceback.format_exc()}')
+        logging.error(f'Failed when merging index data \n {traceback.format_exc()}')
         raise Exception('Merging Index Error')
 
 
@@ -104,7 +102,7 @@ def main():
     column_dict_path = 'columns_dict.json'
 
     if not os.path.exists(column_dict_path):
-        logging.warning(f'Failed when Reading Column Dict \n Column Dict not in this Directory: {column_dict_path}')
+        logging.error(f'Failed when Reading Column Dict \n Column Dict not in this Directory: {column_dict_path}')
         raise Exception(f'Column Dict not in this Directory: {column_dict_path}')
         
     with open(column_dict_path, 'r') as fp:
@@ -114,7 +112,7 @@ def main():
     df_list = [group[1] for group in df.groupby(df['StockNo'])]
     output_list = []
 
-    logging.warning(f'Feature Engineering at {end_date}')
+    logging.info(f'Feature Engineering at {end_date}')
     try:
         if __name__ == '__main__':
             with Pool(processes=5) as pool:
@@ -122,7 +120,7 @@ def main():
                     output_list.append(x)
 
     except:
-        logging.warning(f'Failed when Feature Engineering \n {traceback.format_exc()}')
+        logging.error(f'Failed when Feature Engineering \n {traceback.format_exc()}')
         raise Exception('Feature Engineering Error')
 
     df = pd.concat(output_list, axis=0)  
@@ -131,7 +129,7 @@ def main():
     feature_dict_path = 'feature_dict.json'
 
     if not os.path.exists(feature_dict_path):
-        logging.warning(f'Failed when Reading Feature Dict \n Feature Dict not in this Directory: {feature_dict_path}')
+        logging.error(f'Failed when Reading Feature Dict \n Feature Dict not in this Directory: {feature_dict_path}')
         raise Exception(f'Feature Dict not in this Directory: {feature_dict_path}')
         
     feature = FeatureEngineering.read_feature_list(feature_dict_path, requirement='whole')
@@ -142,7 +140,7 @@ def main():
     #prediction
     results=[]
 
-    logging.warning(f'Predicting at {end_date}')
+    logging.info(f'Predicting at {end_date}')
     try:
         feature_df['ts'] = feature_df['ts'].astype(str)
         for i in range(len(feature_df)):
@@ -150,7 +148,7 @@ def main():
             result = Predict.prediction(this_df)
             results.append(result)
     except:
-        logging.warning(f'Failed when Predicting \n {traceback.format_exc()}')
+        logging.error(f'Failed when Predicting \n {traceback.format_exc()}')
         raise Exception('Predicting Error')
 
     result_df = pd.DataFrame(results, columns=['StockNo','ts','Y_0_score','Y_1_score'])
@@ -160,7 +158,7 @@ def main():
     try:
         Predict.write_to_db(result_df, f'PREDICTION_{end_date}')    
     except:
-        logging.warning(f'Failed when Writing Prediction to Database \n {traceback.format_exc()}')
+        logging.error(f'Failed when Writing Prediction to Database \n {traceback.format_exc()}')
         raise Exception('Writing to Database Error')
 
     

@@ -16,11 +16,14 @@ def send_query(query):
     
     '''
     Function sending query to ODS
-    '''
+    Input: Query(String)
+    Output: Dataframe wanted 
+    '''    
+
     encoding_path = os.path.join(os.sep, 'config', 'mssqltip_bytes.bin')
     if not os.path.exists(encoding_path):
         raise Exception(f'Encoding Document not in this directory: {encoding_path}')
-
+    
     key = b'yFn37HvhJN2XPrV61AIk8eOG8MJw0lBXP2r32CJaPmk='
     cipher_suite = Fernet(key)
     with open(encoding_path, 'rb') as file_object:
@@ -44,17 +47,31 @@ def send_query(query):
 
 
 def VWAP(row):  
+
+    '''
+    Function Computing Daily VWAP
+    Input: row from dataframe containing volume and total
+    Output: vwap
+    '''
+
     if (row['vol'] == 0) or (row['total'] == 0):
         return np.nan
+
     else:
         vwap = row['total']/row['vol']
-        
         return vwap
 
 
 @retry(Exception, tries=4, delay=300)    
 def stock_query(end_date):
 
+    '''
+    Function Querying data from db
+    Input: The date wanted (date type)
+    Output: A list of dataframe including stock, index, industry index
+    '''
+
+    # Precheck If tables in db have updated
     precheck_query = f'''SELECT 
                             MAX([DATE]) as max_date
                         FROM OpenData.dbo.CMONEY_DAILY_CLOSE
@@ -67,6 +84,7 @@ def stock_query(end_date):
     if max_date != end_date:
         raise Exception('Data Not Updated')
     
+    # Start query
     start_date = (end_date - timedelta(days=150)).strftime('%Y%m%d')
     year = end_date.year
     month = end_date.month
@@ -81,6 +99,7 @@ def stock_query(end_date):
     last_month_end = date(last_year, last_month, calendar.monthrange(last_year, last_month)[1]).strftime('%Y%m%d')
     end_date = end_date.strftime('%Y%m%d')
 
+    # Stock
     stock_subquery = f'''SELECT price.ts,
                         price.StockNo,
                         price.StockName, 
@@ -268,6 +287,7 @@ def stock_query(end_date):
     stock_df['On_Date'] = pd.to_datetime(stock_df['On_Date'])
     stock_df['Restart_date'] = pd.to_datetime(stock_df['Restart_date'])
     
+    # Index and Industry Index
     index_subquery = f'''SELECT [DATE] AS ts,
                                 TRY_CAST([OPEN] AS FLOAT) AS [index_open], 
                                 TRY_CAST([HIGH] AS FLOAT) AS [index_high],
@@ -312,19 +332,29 @@ def stock_query(end_date):
 
 def FillMissingTime(data, timedf, end_date):
 
+    '''
+    Filling Missing Time 
+    Input: {'data': dataframe queried from db, 'timedf': Dataframe with all unique timestamps, 'end_date': The day wanted (same as query)}
+    Output: Dataframe containing all timestamps and other information
+    '''
+
     data = data.sort_values(by='ts')
+
+    # Check if the stock is trading today
     if data['ts'].iloc[-1].date() != end_date:
         return [False]
 
     Stock = data['StockNo'].unique()[0]
     timedf = timedf[timedf.ts >= data['On_Date'].iloc[0]]
 
+    # Check if the stock have exchanged enough days
     if len(timedf) <= 1:
         return [False]
 
+    # Check if today is 40 days after reduction
     if len(data[data.eliminate == 1]) != 0:
         restart_date = data[data.eliminate == 1]['ts'].iloc[-1]
-        if len(data[data.ts.dt.date >= restart_date.date()])  <= 40:
+        if len(data[data.ts.dt.date >= restart_date.date()]) <= 40:
             return [False]
 
     d = pd.merge(timedf, data, on="ts", how="left")
@@ -344,6 +374,12 @@ def FillMissingTime(data, timedf, end_date):
 
 
 def industry_reference(row):
+
+    '''
+    Get Industry Index number inorder to merge with industry index
+    Input: row in dataframe with industry
+    Output: Industry index number
+    '''
 
     industry_dict = {'1': 'TWB11', '2': 'TWB12', 
                     '3': 'TWB13', '14': 'TWB25', 
@@ -370,6 +406,12 @@ def industry_reference(row):
         
 
 def merge_index(data, index, industry_index):
+
+    '''
+    Merging stock data with index and industry index
+    Input: {'data': Stock data after filling missing time, 'index': index data, 'industry_index': industry index data}
+    Output: Merged dataframe
+    '''
     
     data['reference'] = data.apply(industry_reference, axis=1)
     df = pd.merge(data, index, on='ts', how='left')
