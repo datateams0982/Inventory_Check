@@ -1,3 +1,10 @@
+# 執行指令
+
+$ python main.py (date)
+例: python main.py 2019-12-02
+- date 可加可不加，若無則自動預設成今日日期
+- date的格式必須為year-month-day
+
 # 檔案結構
  
 ## config: 
