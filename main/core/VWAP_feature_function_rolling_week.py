@@ -272,7 +272,7 @@ def label(row):
         return 0
 
 
-def get_technical_indicators(data, columns_dict, look_back=15, forward=5):
+def get_features(data, columns_dict, look_back=15, forward=5):
 
     '''
     The main function used to create feature
@@ -370,57 +370,6 @@ def get_technical_indicators(data, columns_dict, look_back=15, forward=5):
     d = d.drop(columns=['VWAP_lag', 'close_lag', 'index_close_lag', 'industry_close_lag'])
 
     return d
-
-
-# def separate_engineering(data, columns_dict, look_back=15, forward=5):
-
-#     d = data.sort_values(by='ts')
-#     if len(d[d['eliminate'] != 0]) == 0:
-#         return get_technical_indicators(d, columns_dict, look_back=look_back, forward=forward)
-
-#     else:
-#         start_date = d[d['eliminate'] == 2]['ts'].tolist()
-#         start_date.sort(reverse=True)
-#         df_list = []
-
-#         for start in start_date:
-#             d1 = d[d['ts'] < start]
-#             if len(d1) != 0:
-#                 result = get_technical_indicators(d1, columns_dict, look_back=look_back, forward=forward)
-#                 df_list.append(result)
-
-#                 d = d[d['ts'] >= start]
-#             else:
-#                 continue
-
-#         if len(d) > 0:
-#             result = get_technical_indicators(d, columns_dict, look_back=look_back, forward=forward)
-#             df_list.append(result)
-
-#         df = pd.concat(df_list, axis=0)
-
-#         return df
-
-
-def get_label(data, forward=5):
-
-    '''
-    The main function used to label data
-    Input: {'data': original data frame, containing basic information, 'forward': days looking forward for labeling}
-    Output: a new dataframe containing original information and labels
-    ''' 
-
-    d = data.sort_values(by='ts').reset_index(drop=True)
-
-    d[f'VWAP_day{forward}'] = d['total'].rolling(window=forward, min_periods=1).sum()/d['vol'].rolling(window=forward,min_periods=1).sum()
-    d[f'VWAP_day{forward}'] = d[f'VWAP_day{forward}'].replace([np.inf, -np.inf], np.nan)
-    d[f'VWAP_day{forward}'] = d[f'VWAP_day{forward}'].interpolate(method='pad')
-
-    d['VWAP_after'] = d['VWAP_day5'].shift(-forward)
-    d['Y'] = d.apply(label, axis=1)
-    
-    return d
-
 
 
 def read_feature_list(file_path, requirement='whole'):

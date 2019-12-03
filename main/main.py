@@ -155,7 +155,7 @@ def main(end_date=date.today()):
     try:
         if __name__ == '__main__':
             with Pool(processes=process_num) as pool:
-                for x in pool.imap_unordered(partial(FeatureEngineering.get_technical_indicators, columns_dict=columns_dict, look_back=config['feature_lookback'], forward=config['feature_forward']), df_list):
+                for x in pool.imap_unordered(partial(FeatureEngineering.get_features, columns_dict=columns_dict, look_back=config['feature_lookback'], forward=config['feature_forward']), df_list):
                     output_list.append(x)
 
     except Exception as e:
