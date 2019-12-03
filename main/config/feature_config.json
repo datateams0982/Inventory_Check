@@ -1,0 +1,6 @@
+{   "ratio_days": [5, 10, 15], 
+    "momentum_days": [1, 2, 3, 4, 5, 10, 15], 
+    "STO_nk": [5, 15], 
+    "STO_nD": [3, 5], 
+    "RSI_window": 15, 
+    "pvt_window": 20}

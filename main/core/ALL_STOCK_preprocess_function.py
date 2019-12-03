@@ -3,13 +3,20 @@ import pandas as pd
 import os
 import datetime
 from datetime import datetime, timedelta, date
-from tqdm import tqdm_notebook as tqdm
 from cryptography.fernet import Fernet
 import calendar
-import math
 import pymssql as mssql
-import time
+from pathlib import Path
 from retry import retry
+import json
+
+global config
+config_path = Path(__file__).parent.parent / "config/basic_config.json"
+if not os.path.exists(config_path):
+    raise Exception(f'Configs not in this Directory: {config_path}')
+
+with open(config_path, 'r') as fp:
+    config = json.load(fp)
 
 #Send query to NsSQL
 def send_query(query):
@@ -20,20 +27,20 @@ def send_query(query):
     Output: Dataframe wanted 
     '''    
 
-    encoding_path = os.path.join(os.sep, 'config', 'mssqltip_bytes.bin')
+    encoding_path = Path(__file__).parent.parent / "config/mssqltip_bytes.bin"
     if not os.path.exists(encoding_path):
         raise Exception(f'Encoding Document not in this directory: {encoding_path}')
     
-    key = b'yFn37HvhJN2XPrV61AIk8eOG8MJw0lBXP2r32CJaPmk='
+    key = config['db_pwd_key']
     cipher_suite = Fernet(key)
     with open(encoding_path, 'rb') as file_object:
         for line in file_object:
             encryptedpwd = line
     
-    ods = mssql.connect(host = '128.110.13.89', 
-                      user = 'OpenData', 
+    ods = mssql.connect(host = config['db_host'], 
+                      user = config['db_user'], 
                       password = bytes(cipher_suite.decrypt(encryptedpwd)).decode("utf-8"), 
-                      charset='utf8')
+                      charset=config['db_charset'])
 
     odscur = ods.cursor(as_dict = True)
     odscur.execute(query)
@@ -62,7 +69,7 @@ def VWAP(row):
         return vwap
 
 
-@retry(Exception, tries=4, delay=300)    
+@retry(Exception, tries=config['retry']['tries'], delay=config['retry']['delay'])    
 def stock_query(end_date):
 
     '''
@@ -85,7 +92,7 @@ def stock_query(end_date):
         raise Exception('Data Not Updated')
     
     # Start query
-    start_date = (end_date - timedelta(days=150)).strftime('%Y%m%d')
+    start_date = (end_date - timedelta(days=config['query_back'])).strftime('%Y%m%d')
     year = end_date.year
     month = end_date.month
     if month == 1:
