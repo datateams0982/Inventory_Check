@@ -58,6 +58,7 @@ $ python main.py (date)
 - Encoding Document not in this directory: 加密檔路徑有誤，確認mssqltip_bytes.bin是否在config資料夾下, 檔名是否正確
 - Data Not Updated: 資料庫資料尚未更新 (暫時設定會在五分鐘後重試，最多重試四次)
 - StockIIndex/Industry data length doesn't match: 回傳至python的dataframe長度與query得出之table長度不等
+- 其他錯誤: 檢視traceback並檢視ALL_STOCK_preprocess_function中的stock_query/send_query函式或資料庫連線問題
 
 ## 填補遺漏時間(Filling Missing Time): 
 - 若在此段出錯，檢視traceback並檢視ALL_STOCK_preprocess_function中的FillMissingTime函式
