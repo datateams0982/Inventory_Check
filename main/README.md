@@ -15,8 +15,8 @@
 ** Prediction: 進行預測的函式檔，包含將單筆資料送入預測模型並回傳結果、將結果寫入資料庫
 
 * output:
-** log: 存放過去的log file
-** prediction: 存放過去的預測結果
+- log: 存放過去的log file
+- prediction: 存放過去的預測結果
 
 * main: 主程式
 * requirements: 所需套件及其版本
