@@ -21,4 +21,4 @@
     "predict_url": "http://128.110.238.61:8080/predict",
     "telegram_retry": {"tries": 10, "delay": 20},
     "telegram_token": "1019885094:AAGjz96mPsceOdBS7gEyr-hsZSGC8awJtrM",
-    "telegram_chatID": ["546577986", "997591563"]}
+    "telegram_chatID": ["546577986", "997591563", "408366230"]}
