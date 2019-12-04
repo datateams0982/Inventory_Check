@@ -69,7 +69,7 @@ def VWAP(row):
         return vwap
 
 
-@retry(Exception, tries=config['retry']['tries'], delay=config['retry']['delay'])    
+@retry(Exception, tries=config['query_retry']['tries'], delay=config['query_retry']['delay'])    
 def stock_query(end_date):
 
     '''

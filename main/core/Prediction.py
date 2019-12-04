@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.types import Date, String, Float
 from cryptography.fernet import Fernet
 from pathlib import Path
+from retry import retry
 
 global config
 config_path = Path(__file__).parent.parent / "config/basic_config.json"
@@ -15,6 +16,8 @@ if not os.path.exists(config_path):
 with open(config_path, 'r') as fp:
     config = json.load(fp)
 
+
+@retry(tries=config['prediction_retry']['tries'], delay=config['prediction_retry']['delay'])
 def prediction(df):
 
     df_json = df.to_dict(orient='records')

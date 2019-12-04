@@ -55,6 +55,62 @@ def main(end_date=date.today()):
 
     if type(end_date) == str:
         end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+    
+    result_directory = config['result_path']
+    feature_directory = config['feature_path']
+
+    # Check if Feature Engineering is already done
+    logging.info(f'Checking if Feature Engineering is already done at {end_date}')
+
+    feature_path = Path(__file__).parent / f"{feature_directory}{end_date.strftime('%Y%m%d')}.csv"
+    if os.path.exists(feature_path):
+
+        logging.info(f'Feature Engineering of {end_date} has done. Start to predict directly.')
+        feature_df = pd.read_csv(feature_path, converters={'ts': str, 'StockNo': str})
+        results=[]
+
+        logging.info(f'Predicting at {end_date}')
+        try:
+            feature_df['ts'] = feature_df['ts'].astype(str)
+            for i in range(len(feature_df)):
+                this_df = feature_df.iloc[[i]]
+                result = Predict.prediction(this_df)
+                results.append(result)
+
+        except Exception as e:
+            logging.error(f'Exception: {e}')
+            logging.error(f'Failed when Predicting \n {traceback.format_exc()}')
+            raise Exception('Predicting Error')
+
+        result_df = pd.DataFrame(results, columns=['StockNo','ts','Y_0_score','Y_1_score'])
+        
+        # Write result to local
+        logging.info(f'Writing to Local at {end_date}')
+        result_path = Path(__file__).parent / f"{result_directory}{end_date.strftime('%Y%m%d')}.csv"
+        try:
+            result_df.to_csv(result_path, index=False)
+        except Exception as e:
+            logging.error(f'Exception: {e}')
+            logging.error(f'Failed when Writing Prediction to Local \n {traceback.format_exc()}')
+            raise Exception('Write to Local Error')
+
+
+        # Writing result to DataBase
+        logging.info(f'Writing to Database at {end_date}')
+        try:
+            Predict.write_to_db(result_df, config['writing_table'])    
+        except Exception as e:
+            logging.error(f'Exception: {e}')
+            logging.error(f'Failed when Writing Prediction to Database \n {traceback.format_exc()}')
+            raise Exception('Write to Database Error')
+        
+        logging.info(f'Done at {end_date}')
+    
+        return
+        
+    else:
+        logging.info(f'Feature Engineering at {end_date} has not done. Run the whole process.')
+
 
     # Remove log files and predictions 30 days ago
     logging.info(f"Removing log and results {config['preserve_days']} ago")
@@ -66,17 +122,21 @@ def main(end_date=date.today()):
         else:
             os.remove(remove_log_path)
 
-        result_directory = config['result_path']
         remove_prediction_path = Path(__file__).parent / f'{result_directory}{remove_date}.csv'
         if not os.path.exists(remove_prediction_path):
             logging.warning(f'{remove_prediction_path} Not Exists or removed')
         else:
             os.remove(remove_prediction_path)
 
+        remove_feature_path = Path(__file__).parent / f'{feature_directory}{remove_date}.csv'
+        if not os.path.exists(remove_feature_path):
+            logging.warning(f'{remove_feature_path} Not Exists or removed')
+        else:
+            os.remove(remove_feature_path)
+
     except Exception as e:
         logging.error(f'Exception: {e}')
         logging.error(f"Can't Remove files {config['preserve_days']} days ago")
-        
 
 
     # Read data from DB
@@ -177,6 +237,7 @@ def main(end_date=date.today()):
     feature = FeatureEngineering.read_feature_list(feature_dict_path, requirement='whole')
     df_last = df[df.ts.dt.date == end_date]
     feature_df = df_last[feature]
+    feature_df.to_csv(feature_path, index=False)
 
 
     # prediction

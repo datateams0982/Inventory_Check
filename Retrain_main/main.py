@@ -51,31 +51,31 @@ logger.addHandler(ch)
 logger.addHandler(fh)
 
 
-def main(end_date=date.today()):
+def main(start_date, end_date):
 
     if type(end_date) == str:
         end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+    if type(start_date) == str:
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
 
-    # Remove log files and predictions 30 days ago
+    # Remove Last Training log files and results
     logging.info(f"Removing log and results {config['preserve_days']} ago")
     try:
-        remove_date = (end_date - timedelta(days=config['preserve_days'])).strftime('%Y%m%d')
-        remove_log_path = Path(__file__).parent / f'{log_directory}{remove_date}'
-        if not os.path.exists(remove_log_path):
-            logging.warning(f'{remove_log_path} Not Exists or removed')
-        else:
-            os.remove(remove_log_path)
-
+        remove_log_path = Path(__file__).parent / f'{log_directory}'
+        remove_log_list = os.listdir(remove_log_path)
         result_directory = config['result_path']
-        remove_prediction_path = Path(__file__).parent / f'{result_directory}{remove_date}.csv'
-        if not os.path.exists(remove_prediction_path):
-            logging.warning(f'{remove_prediction_path} Not Exists or removed')
-        else:
-            os.remove(remove_prediction_path)
+        remove_result_path = Path(__file__).parent / f'{result_directory}'
+        remove_result_list = os.listdir(remove_result_path)
+        assert (len(remove_log_list) != 0) and (len(remove_result_list) != 0)
+        for log_file, result_file in zip(remove_log_list, remove_result_list):
+            remove_log_file = remove_log_path + log_file
+            remove_result_file = remove_result_path + result_file
+            os.remove(remove_log_file)
+            os.remove(remove_result_file)
 
     except Exception as e:
         logging.error(f'Exception: {e}')
-        logging.error(f"Can't Remove files {config['preserve_days']} days ago")
+        logging.error(f"Can't Remove previous files")
         
 
 

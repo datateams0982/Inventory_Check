@@ -272,7 +272,7 @@ def label(row):
         return 0
 
 
-def get_features(data, columns_dict, look_back=15, forward=5):
+def get_features(data, columns_dict, look_back, forward):
 
     '''
     The main function used to create feature
@@ -288,8 +288,9 @@ def get_features(data, columns_dict, look_back=15, forward=5):
     d[f'VWAP_day{forward}'] = d[f'VWAP_day{forward}'].replace([np.inf, -np.inf], np.nan)
     d[f'VWAP_day{forward}'] = d[f'VWAP_day{forward}'].interpolate(method='pad')
 
-    # d['VWAP_after'] = d['VWAP_day5'].shift(-forward)
-    # d['Y'] = d.apply(label, axis=1)
+    # Labeling data
+    d['VWAP_after'] = d['VWAP_day5'].shift(-forward)
+    d['Y'] = d.apply(label, axis=1)
 
     # Preparing for return calculation
     lag = columns_dict['lag']

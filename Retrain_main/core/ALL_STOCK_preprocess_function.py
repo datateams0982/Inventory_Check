@@ -69,7 +69,7 @@ def VWAP(row):
         return vwap
 
 
-@retry(Exception, tries=config['retry']['tries'], delay=config['retry']['delay'])    
+@retry(Exception, tries=config['query_retry']['tries'], delay=config['query_retry']['delay'])    
 def stock_query(start_date, end_date):
 
     '''
@@ -104,6 +104,7 @@ def stock_query(start_date, end_date):
 
     last_month_start = date(last_year, last_month, 1).strftime('%Y%m%d')
     last_month_end = date(last_year, last_month, calendar.monthrange(last_year, last_month)[1]).strftime('%Y%m%d')
+    start_date = start_date.strftime('%Y%m%d')
     end_date = end_date.strftime('%Y%m%d')
 
     # Stock
@@ -127,7 +128,6 @@ def stock_query(start_date, end_date):
                         price.industry,
                         price.On_Date,
                         reduction.START_TRADE_DATE as Restart_date,
-						price.PctRank,
                         CASE WHEN START_TRADE_DATE IS NOT NULL THEN 1 ELSE 0 END AS eliminate
                         FROM(
                             SELECT d.[DATE] AS ts,
@@ -148,11 +148,11 @@ def stock_query(start_date, end_date):
                             TRY_CAST(e.[DEALER_INV_RATIO] AS FLOAT) AS dealer_ratio,
                             TRY_CAST(e.[CORP_INV_RATIO] AS FLOAT) AS corporation_ratio,
                             f.[INDUSTRY_ID] AS industry,
-                            f.[EXCHANGE_DATE] AS [On_Date],
-							TRY_CAST(p.PctRank AS FLOAT) AS PctRank
+                            f.[EXCHANGE_DATE] AS [On_Date]
                     FROM 
                         (
-                            SELECT *
+                            SELECT *,
+							SUBSTRING([DATE], 1,4) AS [YEAR]
                             FROM OpenData.dbo.CMONEY_DAILY_CLOSE
                             WHERE 
                                 DATE BETWEEN {start_date} AND {end_date}
@@ -171,57 +171,11 @@ def stock_query(start_date, end_date):
                                 STOCK_ID,
                                 LISTING_TYPE,
                                 INDUSTRY_ID,
-                                EXCHANGE_DATE
+                                EXCHANGE_DATE,
+								[YEAR]
                             FROM OpenData.dbo.CMONEY_LISTED_COMPANY_INFO
-                            WHERE 
-                                [YEAR] = {str(year)}
                         ) f
-                        ON d.STOCK_ID = f.STOCK_ID
-
-						LEFT OUTER JOIN
-						(	
-                                  SELECT 
-                                        STOCK_ID, 
-                                        MONTHLY_AMT,
-                                        PERCENT_RANK() OVER(ORDER BY MONTHLY_AMT) AS PctRank                    
-
-                                    FROM(
-                                        SELECT 
-                                            a.STOCK_ID, 
-                                            SUM(TRY_CAST(AMOUNT AS FLOAT)) as MONTHLY_AMT
-                                        FROM OpenData.dbo.CMONEY_DAILY_CLOSE  a
-                                        LEFT JOIN 
-                                        (    SELECT
-                                                STOCK_ID,
-                                                CONVERT(varchar, EXCHANGE_DATE, 23) as START_DATE,
-                                                LISTING_TYPE,
-                                                INDUSTRY_ID
-                                            FROM OpenData.dbo.CMONEY_LISTED_COMPANY_INFO
-                                            WHERE 
-                                                [YEAR] = {str(year)}
-                                        ) b
-                                        ON a.STOCK_ID = b.STOCK_ID
-                                        LEFT JOIN 
-                                        (    SELECT
-                                                STOCK_ID,
-                                                TERMINATE_DATE
-                                            FROM OpenData.dbo.CMONEY_DELISTED_COMPANY_INFO
-                                            WHERE 
-                                                [YEAR] = {str(year)}
-                                        ) c
-                                        ON a.STOCK_ID = c.STOCK_ID
-                                        WHERE 
-                                            a.DATE BETWEEN {last_month_start} AND {last_month_end}
-                                            AND LEN(a.STOCK_ID) = 4
-                                            AND LEFT(a.STOCK_ID, 1) between '1' and '9'
-                                            AND LISTING_TYPE = 1
-                                            AND TERMINATE_DATE IS NULL
-                                            AND INDUSTRY_ID != '91'
-                                            AND DATEADD(weekday , 60 , START_DATE ) <= CONVERT(varchar, {end_date}, 23)
-                                        GROUP BY a.STOCK_ID
-									) x
-						) p
-						ON d.STOCK_ID = p.STOCK_ID
+                        ON d.STOCK_ID = f.STOCK_ID AND d.[YEAR] = f.[YEAR]
 
                         WHERE 
                             EXISTS(
@@ -230,8 +184,7 @@ def stock_query(start_date, end_date):
                                     SELECT 
                                         STOCK_ID, 
                                         MONTHLY_AMT,
-                                        PERCENT_RANK() OVER(ORDER BY MONTHLY_AMT) AS PctRank                    
-
+                                        PERCENT_RANK() OVER(ORDER BY MONTHLY_AMT) AS PctRank
                                     FROM(
                                         SELECT 
                                             a.STOCK_ID, 
@@ -244,19 +197,17 @@ def stock_query(start_date, end_date):
                                                 LISTING_TYPE,
                                                 INDUSTRY_ID
                                             FROM OpenData.dbo.CMONEY_LISTED_COMPANY_INFO
-                                            WHERE 
-                                                [YEAR] = {str(year)}
+											WHERE [YEAR] = {str(year)}
                                         ) b
-                                        ON a.STOCK_ID = b.STOCK_ID
+                                        ON a.STOCK_ID = b.STOCK_ID 
                                         LEFT JOIN 
                                         (    SELECT
                                                 STOCK_ID,
                                                 TERMINATE_DATE
                                             FROM OpenData.dbo.CMONEY_DELISTED_COMPANY_INFO
-                                            WHERE 
-                                                [YEAR] = {str(year)}
+											WHERE [YEAR] = {str(year)}
                                         ) c
-                                        ON a.STOCK_ID = c.STOCK_ID
+                                        ON a.STOCK_ID = c.STOCK_ID 
                                         WHERE 
                                             a.DATE BETWEEN {last_month_start} AND {last_month_end}
                                             AND LEN(a.STOCK_ID) = 4
@@ -275,8 +226,6 @@ def stock_query(start_date, end_date):
                             (	SELECT STOCK_ID,
                                         START_TRADE_DATE
                                 FROM OpenData.dbo.CMONEY_REDUCT_SUMMARY
-                                WHERE 
-                                    [YEAR] = {str(year)}
                             ) reduction
                             ON price.StockNo = reduction.STOCK_ID AND price.ts = reduction.START_TRADE_DATE
                         '''
@@ -355,14 +304,8 @@ def FillMissingTime(data, timedf, end_date):
     timedf = timedf[timedf.ts >= data['On_Date'].iloc[0]]
 
     # Check if the stock have exchanged enough days
-    if len(timedf) <= 1:
+    if len(timedf) <= 60:
         return [False]
-
-    # Check if today is 40 days after reduction
-    if len(data[data.eliminate == 1]) != 0:
-        restart_date = data[data.eliminate == 1]['ts'].iloc[-1]
-        if len(data[data.ts.dt.date >= restart_date.date()]) <= 40:
-            return [False]
 
     d = pd.merge(timedf, data, on="ts", how="left")
     d = d.sort_values(by="ts")
