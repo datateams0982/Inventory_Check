@@ -18,6 +18,7 @@ $ python main.py (date)
 - ALL_STOCK_preprocess_function: 資料存取與清理的函式檔，包含從資料庫撈取需要的資料、填補遺漏天數、結合(產業)指數資料與個股資料
 - VWAP_feature_function_rolling_week: 進行特徵處理的函式檔，包含特徵處理的主函式及子函示、存取特徵明細的函式
 - Prediction: 進行預測的函式檔，包含將單筆資料送入預測模型並回傳結果、將結果寫入資料庫
+- exception_outbound: 將錯誤及程式運行訊息/預測結果傳至telegram
 
 ## output:
 - log: 存放過去的log file
@@ -44,6 +45,13 @@ $ python main.py (date)
 - 逐筆資料輸入模型預測
 - 將預測資料整合後寫入存放資料夾
 - 將預測資料寫入資料庫
+- 將結果與成功訊息傳至telegram
+
+# 例外處理
+
+- 部分函式將在一段時間過後重新啟動(stock_query, prediction, outbound)
+- 部分例外不影響程式運行，將紀錄於log檔後繼續運行剩餘程式(remove previous log and result)
+- 影響程式運行的例外，將紀錄於log檔後，將錯誤訊息傳至telegram，程式將接著停止運行
 
 # Debug Guidance 
 
@@ -56,7 +64,7 @@ $ python main.py (date)
 - 若存在且筆數足夠則直接讀入檔案進行預測，若在預測或寫入資料庫階段發生錯誤，請往下看'逐筆資料輸入模型預測'及'寫入資料夾/資料庫'
 - 若否，則執行其餘所有流程
 
-## 刪除超過保留天數的log file及預測結果(Removing log and results): 
+## 刪除超過保留天數的log file及預測結果(Removing previous log and results): 
 - 30天前資料不存在或已移除，僅需確認是否已確實移除即可 
 
 ## 從資料庫撈取資料(Query Data From ODS.Opendata): 
@@ -94,5 +102,8 @@ $ python main.py (date)
 ## 將預測資料寫入資料庫(Writing to Database):
 - Encoding Document not in this directory: 加密檔路徑有誤，確認mssqltip_bytes.bin是否在config資料夾下, 檔名是否正確
 - 其他錯誤: 檢視traceback並檢視Prediction中的write_to_db函式或檢視資料庫連線
+
+## 將訊息傳至telegram(Sending message and result to telegram):
+- 若在此段出錯，檢視traceback並檢視exception_outbound中的outbound函式
 
 
