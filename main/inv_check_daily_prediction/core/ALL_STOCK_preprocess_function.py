@@ -18,7 +18,7 @@ if not os.path.exists(config_path):
 with open(config_path, 'r') as fp:
     config = json.load(fp)
 
-#Send query to NsSQL
+#Send query to MsSQL
 def send_query(query):
     
     '''
@@ -44,10 +44,15 @@ def send_query(query):
 
     odscur = ods.cursor(as_dict = True)
     odscur.execute(query)
-    temp = odscur.fetchall()
+    try:
+        temp = odscur.fetchall()
+    except:
+        temp = []
+        
     row_count = int(odscur.rowcount)
     df = pd.DataFrame(temp)
-    odscur.close()
+    ods.commit()
+    ods.close()
 
     return df, row_count
 

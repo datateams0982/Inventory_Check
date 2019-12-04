@@ -8,6 +8,8 @@ from cryptography.fernet import Fernet
 from pathlib import Path
 from retry import retry
 
+from .ALL_STOCK_preprocess_function import send_query
+
 global config
 config_path = Path(__file__).parent.parent / "config/basic_config.json"
 if not os.path.exists(config_path):
@@ -49,7 +51,14 @@ def write_to_db(df, table_name):
                                         host = config['db_host'],
                                         db=config['db']))
 
+    remove_query = f'''DELETE FROM OpenData.dbo.{config['writing_table']} WHERE ts = '{str(df.iloc[0]['ts'])}';'''
+    _, _ = send_query(remove_query)
 
-    df[['ts', 'StockNo', 'Y_0_score', 'Y_1_score']].to_sql(config['writing_table'], con=engine, index=False, if_exists=config['writing_exists'], chunksize=config['writing_chunksize'], dtype={"ts": Date(),"StockNo": String(),"Y_0_score": Float(), "Y_1_score": Float()})
+    df[['ts', 'StockNo', 'Y_0_score', 'Y_1_score']].to_sql(config['writing_table'], 
+                                                            con=engine, 
+                                                            index=False, 
+                                                            if_exists=config['writing_exists'], 
+                                                            chunksize=config['writing_chunksize'],
+                                                            dtype={"ts": Date(),"StockNo": String(),"Y_0_score": Float(), "Y_1_score": Float()})
 
     return

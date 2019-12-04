@@ -15,8 +15,9 @@ from core import VWAP_feature_function_rolling_week as FeatureEngineering
 from core import Prediction as Predict
 from core import exception_outbound 
 
+## Documentation url: https://github.com/datateams0982/Inventory_Check/blob/Online/main/Documentation.md
 
-##Load config
+## Load config
 global config
 config_path = Path(__file__).parent / "config/basic_config.json"
 if not os.path.exists(config_path):
@@ -52,7 +53,7 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 logger.addHandler(fh)
 
-
+## Main Program
 def main(end_date=date.today()):
 
     if type(end_date) == str:

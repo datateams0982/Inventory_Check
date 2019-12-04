@@ -5,6 +5,17 @@ $ python main.py (date)
 - date 可加可不加，若無則自動預設成今日日期
 - date的格式必須為year-month-day
 
+# 如何使用Docker執行
+
+## build
+$ docker build --no-cache -t inv_check_daily_prediction -f ./Dockerfile .
+
+## run
+$ docker run --rm --name inv_check_daily_prediction --mount type=bind,source=[source_directory]/inv_check_daily_prediction,target=/inv_check_daily_prediction inv_check_daily_prediction
+
+## run with specific date
+$ docker run --rm --name inv_check_daily_prediction --mount type=bind,source=[source_directory]/inv_check_daily_prediction,target=/inv_check_daily_prediction inv_check_daily_prediction python /inv_check_daily_prediction/main.py 2019-12-02
+
 # 檔案結構
  
 ## config: 
