@@ -8,7 +8,7 @@ $ python main.py (date)
 # 檔案結構
  
 ## config: 
-- basic_config(基本設定檔): 含資料查詢設定、retry設定、存取資料庫設定、log/result路徑設定、預測模型路徑、舊資料保存天數、特徵工程主要參數設定
+- basic_config(基本設定檔): 含資料查詢設定、retry設定、存取資料庫設定、log/result/feature路徑設定、預測模型路徑、舊資料保存天數、特徵工程主要參數設定、應有最少個股數
 - feature_config(特徵工程設定檔): 計算平均比例/momentum的天數設定、隨機指標天數設定、RSI時間區間設定、價量關係時間區間設定
 - columns_dict(欄位查詢檔): 由特徵工程的主程式(get_technical_indicators)存取，取得需重複進行相同特徵處理的欄位
 - feature_dict(特徵明細檔): 紀錄各模型所採用的特徵，在特徵工程結束後可直接取出需要的特徵
@@ -22,6 +22,7 @@ $ python main.py (date)
 ## output:
 - log: 存放過去的log file
 - prediction: 存放過去的預測結果
+- feature: 存放過去特徵資料
 
 ## 其他:
 - main: 主程式
@@ -32,6 +33,7 @@ $ python main.py (date)
 
 - 讀取基本設定檔
 - logging設定
+- 檢查特徵檔是否已存在，若有則直接進行預測並寫入資料庫
 - 刪除超過保留天數的log file及預測結果
 - 從資料庫撈取資料
 - 填補遺漏時間
@@ -49,6 +51,10 @@ $ python main.py (date)
 - 基本設定檔路徑有誤，確認basic_config.json是否在config資料夾下, 檔名是否正確
 
 ## logging設定
+
+## 檢查特徵檔是否已存在(Checking if Feature Engineering is already done):
+- 若存在且筆數足夠則直接讀入檔案進行預測，若在預測或寫入資料庫階段發生錯誤，請往下看'逐筆資料輸入模型預測'及'寫入資料夾/資料庫'
+- 若否，則執行其餘所有流程
 
 ## 刪除超過保留天數的log file及預測結果(Removing log and results): 
 - 30天前資料不存在或已移除，僅需確認是否已確實移除即可 
