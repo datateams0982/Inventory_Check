@@ -258,7 +258,15 @@ def main(end_date=date.today()):
     feature = FeatureEngineering.read_feature_list(feature_dict_path, requirement='whole')
     df_last = df[df.ts.dt.date == end_date]
     feature_df = df_last[feature]
-    feature_df.to_csv(feature_path, index=False)
+
+    logging.info(f'Writing Feature to Local at {end_date}')
+    try:
+        feature_df.to_csv(feature_path, index=False)
+    except Exception as e:
+        logging.error(f'Exception: {e}')
+        logging.error(f'Failed when Writing Feature to Local \n{traceback.format_exc()}')
+        exception_outbound.outbound(message=f'Exception while writing feature to local: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
+        raise Exception('Write feature to local Error')
 
 
     # prediction
