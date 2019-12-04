@@ -127,7 +127,7 @@ def main(end_date=date.today()):
 
 
     # Remove log files and predictions 30 days ago
-    logging.info(f"Removing log and results {config['preserve_days']} ago")
+    logging.info(f"Removing previous log and results {config['preserve_days']} ago")
     try:
         remove_date = (end_date - timedelta(days=config['preserve_days'])).strftime('%Y%m%d')
         remove_log_path = Path(__file__).parent / f'{log_directory}{remove_date}'
@@ -150,7 +150,7 @@ def main(end_date=date.today()):
 
     except Exception as e:
         logging.error(f'Exception: {e}')
-        logging.error(f"Can't Remove files {config['preserve_days']} days ago")
+        logging.error(f"Can't Remove previous files {config['preserve_days']} days ago")
 
 
     # Read data from DB
