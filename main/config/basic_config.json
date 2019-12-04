@@ -1,5 +1,7 @@
 {   "query_retry": {"tries": 4, "delay": 300}, 
-    "query_back": 150, "multiprocess": 5, 
+    "check_length": 850,
+    "query_back": 150, 
+    "multiprocess": 5, 
     "feature_lookback": 15, 
     "feature_forward": 5, 
     "feature_requirement": "whole", 
@@ -16,4 +18,7 @@
     "feature_path": "output/feature/feature_",
     "preserve_days": 30,
     "prediction_retry": {"tries": 5, "delay": 120},
-    "predict_url": "http://128.110.238.60:8080/predict"}
+    "predict_url": "http://128.110.238.61:8080/predict",
+    "telegram_retry": {"tries": 10, "delay": 20},
+    "telegram_token": "1019885094:AAGjz96mPsceOdBS7gEyr-hsZSGC8awJtrM",
+    "telegram_chatID": ["546577986", "997591563"]}

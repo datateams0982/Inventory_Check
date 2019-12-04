@@ -13,12 +13,14 @@ import sys
 from core import ALL_STOCK_preprocess_function as preprocess
 from core import VWAP_feature_function_rolling_week as FeatureEngineering
 from core import Prediction as Predict
+from core import exception_outbound 
 
 
 ##Load config
 global config
 config_path = Path(__file__).parent / "config/basic_config.json"
 if not os.path.exists(config_path):
+    exception_outbound.outbound(message=f'Exception while reading basic config: \nConfigs not in this Directory: {config_path}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
     raise Exception(f'Configs not in this Directory: {config_path}')
 
 with open(config_path, 'r') as fp:
@@ -65,49 +67,61 @@ def main(end_date=date.today()):
     feature_path = Path(__file__).parent / f"{feature_directory}{end_date.strftime('%Y%m%d')}.csv"
     if os.path.exists(feature_path):
 
-        logging.info(f'Feature Engineering of {end_date} has done. Start to predict directly.')
         feature_df = pd.read_csv(feature_path, converters={'ts': str, 'StockNo': str})
-        results=[]
+        if len(feature_df) >= config['check_length']:
 
-        logging.info(f'Predicting at {end_date}')
-        try:
-            feature_df['ts'] = feature_df['ts'].astype(str)
-            for i in range(len(feature_df)):
-                this_df = feature_df.iloc[[i]]
-                result = Predict.prediction(this_df)
-                results.append(result)
+            logging.info(f'Feature Engineering of {end_date} has done. Start to predict directly.')
+            results=[]
+            logging.info(f'Predicting at {end_date}')
+            try:
+                feature_df['ts'] = feature_df['ts'].astype(str)
+                for i in range(len(feature_df)):
+                    this_df = feature_df.iloc[[i]]
+                    result = Predict.prediction(this_df)
+                    results.append(result)
 
-        except Exception as e:
-            logging.error(f'Exception: {e}')
-            logging.error(f'Failed when Predicting \n {traceback.format_exc()}')
-            raise Exception('Predicting Error')
+            except Exception as e:
+                logging.error(f'Exception: {e}')
+                logging.error(f'Failed when Predicting \n{traceback.format_exc()}')
+                exception_outbound.outbound(message=f'Exception while predicting: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
+                raise Exception('Predicting Error')
 
-        result_df = pd.DataFrame(results, columns=['StockNo','ts','Y_0_score','Y_1_score'])
-        
-        # Write result to local
-        logging.info(f'Writing to Local at {end_date}')
-        result_path = Path(__file__).parent / f"{result_directory}{end_date.strftime('%Y%m%d')}.csv"
-        try:
-            result_df.to_csv(result_path, index=False)
-        except Exception as e:
-            logging.error(f'Exception: {e}')
-            logging.error(f'Failed when Writing Prediction to Local \n {traceback.format_exc()}')
-            raise Exception('Write to Local Error')
+            result_df = pd.DataFrame(results, columns=['StockNo','ts','Y_0_score','Y_1_score'])
+            
+            # Write result to local
+            logging.info(f'Writing to Local at {end_date}')
+            result_path = Path(__file__).parent / f"{result_directory}{end_date.strftime('%Y%m%d')}.csv"
+            try:
+                result_df.to_csv(result_path, index=False)
+            except Exception as e:
+                logging.error(f'Exception: {e}')
+                logging.error(f'Failed when Writing Prediction to Local \n{traceback.format_exc()}')
+                exception_outbound.outbound(message=f'Exception while writing prediction to local: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
+                raise Exception('Write to Local Error')
 
 
-        # Writing result to DataBase
-        logging.info(f'Writing to Database at {end_date}')
-        try:
-            Predict.write_to_db(result_df, config['writing_table'])    
-        except Exception as e:
-            logging.error(f'Exception: {e}')
-            logging.error(f'Failed when Writing Prediction to Database \n {traceback.format_exc()}')
-            raise Exception('Write to Database Error')
-        
-        logging.info(f'Done at {end_date}')
-    
-        return
-        
+            # Writing result to DataBase
+            logging.info(f'Writing to Database at {end_date}')
+            try:
+                Predict.write_to_db(result_df, config['writing_table'])    
+            except Exception as e:
+                logging.error(f'Exception: {e}')
+                logging.error(f'Failed when Writing Prediction to Database \n{traceback.format_exc()}')
+                exception_outbound.outbound(message=f'Exception while writing prediction to Database: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
+                raise Exception('Write to Database Error')
+            
+            logging.info(f'Done at {end_date}')
+            logging.info(f'Sending message and result to telegram at {end_date}')
+            try:
+                exception_outbound.outbound(message=f'Prediction at {end_date} Success; \nTime: {datetime.utcnow() + timedelta(hours=8)}', message_type='success', file_path=result_path)
+            except Exception as e:
+                logging.error(f'Exception: {e}')
+                logging.error(f'Failed when sending message to telegram \n{traceback.format_exc()}')
+
+            return
+
+        else:
+            logging.info(f'Feature Engineering at {end_date} has not done. Run the whole process.')
     else:
         logging.info(f'Feature Engineering at {end_date} has not done. Run the whole process.')
 
@@ -145,7 +159,8 @@ def main(end_date=date.today()):
         d = preprocess.stock_query(end_date)
     except Exception as e:
         logging.error(f'Exception: {e}')
-        logging.error(f'Query Failed \n {traceback.format_exc()}')
+        logging.error(f'Query Failed \n{traceback.format_exc()}')
+        exception_outbound.outbound(message=f'Exception while quering data from ODS.Opendata: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception('Query Error')
 
     stock, index, industry_index = d[0], d[1], d[2]
@@ -171,7 +186,8 @@ def main(end_date=date.today()):
 
     except Exception as e:
         logging.error(f'Exception: {e}')
-        logging.error(f'Failed when filling missing time \n {traceback.format_exc()}')
+        logging.error(f'Failed when filling missing time \n{traceback.format_exc()}')
+        exception_outbound.outbound(message=f'Exception while filling missing time: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception('Filling Time Error')
 
     df = pd.concat(output_list)
@@ -192,7 +208,8 @@ def main(end_date=date.today()):
 
     except Exception as e:
         logging.error(f'Exception: {e}')
-        logging.error(f'Failed when merging index data \n {traceback.format_exc()}')
+        logging.error(f'Failed when merging index data \n{traceback.format_exc()}')
+        exception_outbound.outbound(message=f'Exception while merging index data: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception('Merging Index Error')
 
 
@@ -201,7 +218,8 @@ def main(end_date=date.today()):
 
     logging.info(f'Reading column dict at {end_date}')
     if not os.path.exists(column_dict_path):
-        logging.error(f'Failed when Reading Column Dict \n Column Dict not in this Directory: {column_dict_path}')
+        logging.error(f'Failed when Reading Column Dict \nColumn Dict not in this Directory: {column_dict_path}')
+        exception_outbound.outbound(message=f'Exception while reading column dict: \nColumn Dict not in this Directory: {column_dict_path}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception(f'Column Dict not in this Directory: {column_dict_path}')
         
     with open(column_dict_path, 'r') as fp:
@@ -220,7 +238,8 @@ def main(end_date=date.today()):
 
     except Exception as e:
         logging.error(f'Exception: {e}')
-        logging.error(f'Failed when Feature Engineering \n {traceback.format_exc()}')
+        logging.error(f'Failed when Feature Engineering \n{traceback.format_exc()}')
+        exception_outbound.outbound(message=f'Exception while feature engineering: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception('Feature Engineering Error')
 
     df = pd.concat(output_list, axis=0)  
@@ -231,7 +250,8 @@ def main(end_date=date.today()):
 
     logging.info(f'Reading feature list at {end_date}')
     if not os.path.exists(feature_dict_path):
-        logging.error(f'Failed when Reading Feature Dict \n Feature Dict not in this Directory: {feature_dict_path}')
+        logging.error(f'Failed when Reading Feature Dict \nFeature Dict not in this Directory: {feature_dict_path}')
+        exception_outbound.outbound(message=f'Exception while reading feature dict: \nFeature Dict not in this Directory: {feature_dict_path}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception(f'Feature Dict not in this Directory: {feature_dict_path}')
         
     feature = FeatureEngineering.read_feature_list(feature_dict_path, requirement='whole')
@@ -252,7 +272,8 @@ def main(end_date=date.today()):
             results.append(result)
     except Exception as e:
         logging.error(f'Exception: {e}')
-        logging.error(f'Failed when Predicting \n {traceback.format_exc()}')
+        logging.error(f'Failed when Predicting \n{traceback.format_exc()}')
+        exception_outbound.outbound(message=f'Exception while predicting: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception('Predicting Error')
 
     result_df = pd.DataFrame(results, columns=['StockNo','ts','Y_0_score','Y_1_score'])
@@ -264,7 +285,8 @@ def main(end_date=date.today()):
         result_df.to_csv(result_path, index=False)
     except Exception as e:
         logging.error(f'Exception: {e}')
-        logging.error(f'Failed when Writing Prediction to Local \n {traceback.format_exc()}')
+        logging.error(f'Failed when Writing Prediction to Local \n{traceback.format_exc()}')
+        exception_outbound.outbound(message=f'Exception while writing prediction to local: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception('Write to Local Error')
 
 
@@ -274,11 +296,17 @@ def main(end_date=date.today()):
         Predict.write_to_db(result_df, config['writing_table'])    
     except Exception as e:
         logging.error(f'Exception: {e}')
-        logging.error(f'Failed when Writing Prediction to Database \n {traceback.format_exc()}')
+        logging.error(f'Failed when Writing Prediction to Database \n{traceback.format_exc()}')
+        exception_outbound.outbound(message=f'Exception while writing prediction to Database: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception('Write to Database Error')
     
-
     logging.info(f'Done at {end_date}')
+    logging.info(f'Sending message and result to telegram at {end_date}')
+    try:
+        exception_outbound.outbound(message=f'Prediction at {end_date} Success; \nTime: {datetime.utcnow() + timedelta(hours=8)}', message_type='success', file_path=result_path)
+    except Exception as e:
+        logging.error(f'Exception: {e}')
+        logging.error(f'Failed when sending message to telegram \n{traceback.format_exc()}')
 
     return
 
