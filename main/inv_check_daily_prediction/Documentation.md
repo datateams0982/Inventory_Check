@@ -53,6 +53,7 @@ $ docker run --rm --name inv_check_daily_prediction --mount type=bind,source=[so
 - 讀取欄位查詢檔
 - 進行特徵工程
 - 讀取特徵明細檔，並取出需要特徵
+- 將所需特徵寫入存放資料夾
 - 逐筆資料輸入模型預測
 - 將預測資料整合後寫入存放資料夾
 - 將預測資料寫入資料庫
@@ -101,6 +102,9 @@ $ docker run --rm --name inv_check_daily_prediction --mount type=bind,source=[so
 ## 讀取特徵明細檔，並取出需要特徵(Reading feature list):
 - Feature Dict not in this Directory: 特徵明細檔路徑有誤，確認feature_dict.json是否在config資料夾下, 檔名是否正確
 - 其他錯誤: 檢視traceback並檢視VWAP_feature_function_rolling_week中的read_feature_lists函式
+
+## 將所需特徵寫入存放資料夾(Writing Feature to Local):
+- 存取問題
 
 ## 逐筆資料輸入模型預測(Predicting):
 - Configs not in this Directory: 基本設定檔路徑有誤，確認basic_config.json是否在config資料夾下, 檔名是否正確
