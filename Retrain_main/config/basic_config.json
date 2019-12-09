@@ -10,8 +10,8 @@
     "db_pwd_key": "yFn37HvhJN2XPrV61AIk8eOG8MJw0lBXP2r32CJaPmk=", 
     "db_charset": "utf8", 
     "db": "OpenData",  
-    "log_path": "output/log/log_", 
-    "feature_path": "output/feature/feature_",
+    "log_path": "output/log/", 
+    "feature_path": "output/feature/",
     "telegram_retry": {"tries": 10, "delay": 20},
     "telegram_token": "1019885094:AAGjz96mPsceOdBS7gEyr-hsZSGC8awJtrM",
     "telegram_chatID": ["546577986", "997591563", "408366230"]}

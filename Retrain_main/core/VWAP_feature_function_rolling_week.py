@@ -285,7 +285,7 @@ def get_features(data, columns_dict, look_back, forward):
     d['total'] = d['total'] * 1000
 
     # Computing n days VWAP
-    d[f'VWAP_day{forward}'] = d['total'].rolling(window=forward, min_periods=1).sum()/d['vol'].rolling(window=forward,min_periods=1).sum()
+    d[f'VWAP_day{forward}'] = d['total'].rolling(window=forward, min_periods=1).sum()/d['vol'].rolling(window=forward, min_periods=1).sum()
     d[f'VWAP_day{forward}'] = d[f'VWAP_day{forward}'].replace([np.inf, -np.inf], np.nan)
     d[f'VWAP_day{forward}'] = d[f'VWAP_day{forward}'].interpolate(method='pad')
 

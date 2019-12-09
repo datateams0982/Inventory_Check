@@ -39,7 +39,7 @@ global today_date
 today_date = date.today().strftime('%Y%m%d')
 global log_directory
 log_directory = config['log_path']
-log_path = Path(__file__).parent / f"{log_directory}{today_date}"
+log_path = Path(__file__).parent / f"{log_directory}log_{today_date}"
 if not os.path.exists(log_path):
     with open(log_path, 'a'):
         os.utime(log_path, None)
@@ -71,15 +71,13 @@ def main(start_date, end_date):
     try:
         remove_log_path = Path(__file__).parent / f'{log_directory}'
         remove_log_list = os.listdir(remove_log_path)
-        result_directory = config['result_path']
-        remove_result_path = Path(__file__).parent / f'{result_directory}'
-        remove_result_list = os.listdir(remove_result_path)
-        assert (len(remove_log_list) != 0) and (len(remove_result_list) != 0)
-        for log_file, result_file in zip(remove_log_list, remove_result_list):
+        remove_feature_list = os.listdir(feature_path)
+        assert (len(remove_log_list) != 0) and (len(remove_feature_list) != 0)
+        for log_file, feature_file in zip(remove_log_list, remove_feature_list):
             remove_log_file = remove_log_path + log_file
-            remove_result_file = remove_result_path + result_file
+            remove_feature_file = feature_path + feature_file
             os.remove(remove_log_file)
-            os.remove(remove_result_file)
+            os.remove(remove_feature_file)
 
     except Exception as e:
         logging.error(f'Exception: {e}')
@@ -199,7 +197,7 @@ def main(start_date, end_date):
         exception_outbound.outbound(message=f'Exception while reading feature dict: \nFeature Dict not in this Directory: {feature_dict_path}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception(f'Feature Dict not in this Directory: {feature_dict_path}')
         
-    feature = FeatureEngineering.read_feature_list(feature_dict_path, requirement='whole')
+    feature = FeatureEngineering.read_feature_list(feature_dict_path, requirement=config['feature_requirement'])
     train_feature = feature + ['Y']
     test_feature = feature
 

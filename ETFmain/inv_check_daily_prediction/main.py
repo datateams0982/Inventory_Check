@@ -189,7 +189,7 @@ def main(start_date, end_date):
         exception_outbound.outbound(message=f'Exception while reading feature dict: \nFeature Dict not in this Directory: {feature_dict_path}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception(f'Feature Dict not in this Directory: {feature_dict_path}')
         
-    feature = FeatureEngineering.read_feature_list(feature_dict_path, requirement='whole')
+    feature = FeatureEngineering.read_feature_list(feature_dict_path, requirement=config['feature_requirement'])
     feature_df = df[feature]
     
 

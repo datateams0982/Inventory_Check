@@ -1,0 +1,8 @@
+2019-12-09 15:20:31 - root - INFO: - Removing previous log and results
+2019-12-09 15:20:31 - root - ERROR: - Exception: [WinError 3] 系統找不到指定的路徑。: 'output\\log\\log_'
+2019-12-09 15:20:31 - root - ERROR: - Can't Remove previous files
+2019-12-09 15:20:31 - root - INFO: - Query Data From ODS.Opendata at 20191209
+2019-12-09 15:24:01 - root - INFO: - Filling Missing Time at 20191209
+2019-12-09 15:24:10 - root - INFO: - Merging Stock Data with Index Data at 20191209
+2019-12-09 15:24:59 - root - INFO: - Reading column dict at 20191209
+2019-12-09 15:25:00 - root - INFO: - Feature Engineering at 20191209
