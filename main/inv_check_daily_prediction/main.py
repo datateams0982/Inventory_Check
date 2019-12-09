@@ -255,7 +255,7 @@ def main(end_date=date.today()):
         exception_outbound.outbound(message=f'Exception while reading feature dict: \nFeature Dict not in this Directory: {feature_dict_path}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception(f'Feature Dict not in this Directory: {feature_dict_path}')
         
-    feature = FeatureEngineering.read_feature_list(feature_dict_path, requirement='whole')
+    feature = FeatureEngineering.read_feature_list(feature_dict_path, requirement=config['feature_requirement'])
     df_last = df[df.ts.dt.date == end_date]
     feature_df = df_last[feature]
 

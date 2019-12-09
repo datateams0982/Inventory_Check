@@ -1,0 +1,6 @@
+{   "lag": ["index_close", "close", "VWAP", "VWAP_day5"], 
+    "return": ["index", "close", "VWAP", "VWAP_day5"], 
+    "ratio": ["index_close", "index_vol", "index_return", "VWAP_return", "close_return", "vol", "VWAP", "VWAP_day5", "VWAP_day5_return"], 
+    "momentum": ["index_close", "index_vol", "index_return", "VWAP_return", "close_return", "vol", "VWAP", "VWAP_day5", "VWAP_day5_return"], 
+    "moment": ["index_close", "index_vol", "vol", "VWAP", "VWAP_day5", "VWAP_day5_return"], 
+    "buyer": ["foreign_buy", "investment_buy", "dealer_buy"]}

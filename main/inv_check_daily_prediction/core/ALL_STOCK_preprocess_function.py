@@ -121,7 +121,8 @@ def stock_query(end_date):
                         price.[close], 
                         price.vol,
                         price.total,
-                        price.capital, 
+                        price.capital,
+                        price.VWAP, 
                         price.foreign_buy,
                         price.investment_buy, 
                         price.dealer_buy,
@@ -142,9 +143,10 @@ def stock_query(end_date):
                             TRY_CAST(d.[HIGH] AS FLOAT) AS [high],
                             TRY_CAST(d.[LOW] AS FLOAT) AS [low],
                             TRY_CAST(d.[CLOSE] AS FLOAT) AS [close],
-                            TRY_CAST(d.[VOLUME] AS FLOAT) AS vol,
+                            TRY_CAST(d.[VOLUME_SHARES] AS FLOAT) AS vol,
                             TRY_CAST(d.[AMOUNT] AS FLOAT) AS total,
                             TRY_CAST(d.[CAPITAL] AS FLOAT) AS capital,
+                            TRY_CAST(d.[VWAP] AS FLOAT) AS VWAP,
                             TRY_CAST(e.[FOREIGN_VOL] AS FLOAT) AS foreign_buy,
                             TRY_CAST(e.[INVEST_VOL] AS FLOAT) AS investment_buy,
                             TRY_CAST(e.[DEALER_VOL] AS FLOAT) AS dealer_buy, 
@@ -291,10 +293,6 @@ def stock_query(end_date):
     if len(stock_df) != stock_row:
         raise Exception("Stock data length doesn't match")
 
-    stock_df['VWAP'] = stock_df.apply(VWAP, axis=1)
-    stock_df['VWAP'] = round(stock_df['VWAP'].astype(np.float64), 4)
-    stock_df['ts'] = stock_df['ts'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
-    stock_df['On_Date'] = stock_df['On_Date'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
     stock_df['ts'] = pd.to_datetime(stock_df['ts'])
     stock_df['On_Date'] = pd.to_datetime(stock_df['On_Date'])
     stock_df['Restart_date'] = pd.to_datetime(stock_df['Restart_date'])
@@ -329,13 +327,10 @@ def stock_query(end_date):
     if len(index_df) != index_row:
         raise Exception("Index data length doesn't match")
 
-    index_df['ts'] = index_df['ts'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
-
     industry_df, industry_row= send_query(industry_subquery)
     if len(industry_df) != industry_row:
         raise Exception("Index data length doesn't match")
 
-    industry_df['ts'] = industry_df['ts'].apply(lambda x: datetime.strptime(str(x)[:4] + '-' + str(x)[4:6] + '-' + str(x)[6:], '%Y-%m-%d').date())
     index_df['ts'] = pd.to_datetime(index_df['ts'])
     industry_df['ts'] = pd.to_datetime(industry_df['ts'])
     

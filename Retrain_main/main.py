@@ -13,12 +13,15 @@ import sys
 from core import ALL_STOCK_preprocess_function as preprocess
 from core import VWAP_feature_function_rolling_week as FeatureEngineering
 from core import Prediction as Predict
+from core import exception_outbound 
 
+## Documentation url: https://github.com/datateams0982/Inventory_Check/blob/Online/main/Documentation.md
 
-##Load config
+## Load config
 global config
 config_path = Path(__file__).parent / "config/basic_config.json"
 if not os.path.exists(config_path):
+    exception_outbound.outbound(message=f'Exception while reading basic config: \nConfigs not in this Directory: {config_path}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
     raise Exception(f'Configs not in this Directory: {config_path}')
 
 with open(config_path, 'r') as fp:
@@ -32,9 +35,11 @@ formatter = logging.Formatter(
     '%(asctime)s - %(name)s - %(levelname)s: - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S')
 
+global today_date
+today_date = date.today().strftime('%Y%m%d')
 global log_directory
 log_directory = config['log_path']
-log_path = Path(__file__).parent / f"{log_directory}{date.today().strftime('%Y%m%d')}"
+log_path = Path(__file__).parent / f"{log_directory}{today_date}"
 if not os.path.exists(log_path):
     with open(log_path, 'a'):
         os.utime(log_path, None)
@@ -50,16 +55,19 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 logger.addHandler(fh)
 
-
+## Main Program
 def main(start_date, end_date):
 
     if type(end_date) == str:
         end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
     if type(start_date) == str:
         start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+    
+    feature_directory = config['feature_path']
+    feature_path = Path(__file__).parent / f'{feature_directory}'
 
-    # Remove Last Training log files and results
-    logging.info(f"Removing log and results {config['preserve_days']} ago")
+    # Remove previous log files and features
+    logging.info(f"Removing previous log and results")
     try:
         remove_log_path = Path(__file__).parent / f'{log_directory}'
         remove_log_list = os.listdir(remove_log_path)
@@ -76,16 +84,16 @@ def main(start_date, end_date):
     except Exception as e:
         logging.error(f'Exception: {e}')
         logging.error(f"Can't Remove previous files")
-        
 
 
     # Read data from DB
-    logging.info(f"Query Data From ODS.Opendata at {end_date}")
+    logging.info(f"Query Data From ODS.Opendata at {today_date}")
     try:
-        d = preprocess.stock_query(end_date)
+        d = preprocess.stock_query(start_date, end_date)
     except Exception as e:
         logging.error(f'Exception: {e}')
-        logging.error(f'Query Failed \n {traceback.format_exc()}')
+        logging.error(f'Query Failed \n{traceback.format_exc()}')
+        exception_outbound.outbound(message=f'Exception while quering data from ODS.Opendata: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception('Query Error')
 
     stock, index, industry_index = d[0], d[1], d[2]
@@ -99,7 +107,7 @@ def main(start_date, end_date):
 
     process_num = config['multiprocess']
     
-    logging.info(f"Filling Missing Time at {end_date}")
+    logging.info(f"Filling Missing Time at {today_date}")
     try:
         if __name__ == '__main__':
             with Pool(processes=process_num) as pool:
@@ -111,7 +119,8 @@ def main(start_date, end_date):
 
     except Exception as e:
         logging.error(f'Exception: {e}')
-        logging.error(f'Failed when filling missing time \n {traceback.format_exc()}')
+        logging.error(f'Failed when filling missing time \n{traceback.format_exc()}')
+        exception_outbound.outbound(message=f'Exception while filling missing time: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception('Filling Time Error')
 
     df = pd.concat(output_list)
@@ -121,7 +130,7 @@ def main(start_date, end_date):
     df_list = [group[1] for group in df.groupby(df['StockNo'])]
     output_list = []
 
-    logging.info(f'Merging Stock Data with Index Data at {end_date}')
+    logging.info(f'Merging Stock Data with Index Data at {today_date}')
     try:
         if __name__ == '__main__':
             with Pool(processes=process_num) as pool:
@@ -132,16 +141,18 @@ def main(start_date, end_date):
 
     except Exception as e:
         logging.error(f'Exception: {e}')
-        logging.error(f'Failed when merging index data \n {traceback.format_exc()}')
+        logging.error(f'Failed when merging index data \n{traceback.format_exc()}')
+        exception_outbound.outbound(message=f'Exception while merging index data: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception('Merging Index Error')
 
 
     # Reading column dict
     column_dict_path = Path(__file__).parent / "config/columns_dict.json"
 
-    logging.info(f'Reading column dict at {end_date}')
+    logging.info(f'Reading column dict at {today_date}')
     if not os.path.exists(column_dict_path):
-        logging.error(f'Failed when Reading Column Dict \n Column Dict not in this Directory: {column_dict_path}')
+        logging.error(f'Failed when Reading Column Dict \nColumn Dict not in this Directory: {column_dict_path}')
+        exception_outbound.outbound(message=f'Exception while reading column dict: \nColumn Dict not in this Directory: {column_dict_path}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception(f'Column Dict not in this Directory: {column_dict_path}')
         
     with open(column_dict_path, 'r') as fp:
@@ -151,81 +162,70 @@ def main(start_date, end_date):
     df_list = [group[1] for group in df.groupby(df['StockNo'])]
     output_list = []
 
-    logging.info(f'Feature Engineering at {end_date}')
+    logging.info(f'Feature Engineering at {today_date}')
     try:
         if __name__ == '__main__':
             with Pool(processes=process_num) as pool:
-                for x in pool.imap_unordered(partial(FeatureEngineering.get_features, columns_dict=columns_dict, look_back=config['feature_lookback'], forward=config['feature_forward']), df_list):
+                for x in pool.imap_unordered(partial(FeatureEngineering.separate_engineering, columns_dict=columns_dict, look_back=config['feature_lookback'], forward=config['feature_forward']), df_list):
                     output_list.append(x)
 
     except Exception as e:
         logging.error(f'Exception: {e}')
-        logging.error(f'Failed when Feature Engineering \n {traceback.format_exc()}')
+        logging.error(f'Failed when Feature Engineering \n{traceback.format_exc()}')
+        exception_outbound.outbound(message=f'Exception while feature engineering: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception('Feature Engineering Error')
 
     df = pd.concat(output_list, axis=0)  
+    df = df[df['SOk15_5'] != 0]
+    df = df.fillna(0)
+
+    # Split Training and Testing set
+    logging.info(f'Split Training and Testing Data at {today_date}')
+    try:
+        train_df, test_df = FeatureEngineering.TrainTestSplit(df, SplitDate=config['split_date'])
+    except Exception as e:
+        logging.error(f'Exception: {e}')
+        logging.error(f'Failed when Splitting Training and Testing Data \n{traceback.format_exc()}')
+        exception_outbound.outbound(message=f'Exception while Splitting Training and Testing Data: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
+        raise Exception('Split Training and Testing Data Error')
 
 
     # Reading Feature List
     feature_dict_path = Path(__file__).parent / "config/feature_dict.json"
 
-    logging.info(f'Reading feature list at {end_date}')
+    logging.info(f'Reading feature list at {today_date}')
     if not os.path.exists(feature_dict_path):
-        logging.error(f'Failed when Reading Feature Dict \n Feature Dict not in this Directory: {feature_dict_path}')
+        logging.error(f'Failed when Reading Feature Dict \nFeature Dict not in this Directory: {feature_dict_path}')
+        exception_outbound.outbound(message=f'Exception while reading feature dict: \nFeature Dict not in this Directory: {feature_dict_path}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception(f'Feature Dict not in this Directory: {feature_dict_path}')
         
     feature = FeatureEngineering.read_feature_list(feature_dict_path, requirement='whole')
-    df_last = df[df.ts.dt.date == end_date]
-    feature_df = df_last[feature]
+    train_feature = feature + ['Y']
+    test_feature = feature
 
-
-    # prediction
-    results=[]
-
-    logging.info(f'Predicting at {end_date}')
-    try:
-        feature_df['ts'] = feature_df['ts'].astype(str)
-        for i in range(len(feature_df)):
-            this_df = feature_df.iloc[[i]]
-            result = Predict.prediction(this_df)
-            results.append(result)
-    except Exception as e:
-        logging.error(f'Exception: {e}')
-        logging.error(f'Failed when Predicting \n {traceback.format_exc()}')
-        raise Exception('Predicting Error')
-
-    result_df = pd.DataFrame(results, columns=['StockNo','ts','Y_0_score','Y_1_score'])
-    
-    # Write result to local
-    logging.info(f'Writing to Local at {end_date}')
-    result_path = Path(__file__).parent / f"{result_directory}{end_date.strftime('%Y%m%d')}.csv"
-    try:
-        result_df.to_csv(result_path, index=False)
-    except Exception as e:
-        logging.error(f'Exception: {e}')
-        logging.error(f'Failed when Writing Prediction to Local \n {traceback.format_exc()}')
-        raise Exception('Write to Local Error')
-
-
-    # Writing result to DataBase
-    logging.info(f'Writing to Database at {end_date}')
-    try:
-        Predict.write_to_db(result_df, config['writing_table'])    
-    except Exception as e:
-        logging.error(f'Exception: {e}')
-        logging.error(f'Failed when Writing Prediction to Database \n {traceback.format_exc()}')
-        raise Exception('Write to Database Error')
+    train_df = train_df[train_feature]
+    test_df = test_df[test_feature]
     
 
-    logging.info(f'Done at {end_date}')
+    logging.info(f'Writing Feature to Local at {today_date}')
+    try:
+        train_df.to_csv(f'{feature_path}training_{today_date}.csv', index=False)
+        test_df.to_csv(f'{feature_path}testing_{today_date}.csv', index=False)
+    except Exception as e:
+        logging.error(f'Exception: {e}')
+        logging.error(f'Failed when Writing Feature to Local \n{traceback.format_exc()}')
+        exception_outbound.outbound(message=f'Exception while writing feature to local: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
+        raise Exception('Write feature to local Error')
+    
+    logging.info(f'Data Preprocess Done at {today_date}')
+
 
     return
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        end_date = sys.argv[1]
-        main(end_date)
-    else:
-        main()
+    start_date = sys.argv[1]
+    end_date = sys.argv[2]
+    main(start_date, end_date)
+
 
     

@@ -282,7 +282,7 @@ def get_features(data, columns_dict, look_back=15, forward=5):
     ''' 
 
     d = data.sort_values(by='ts').reset_index(drop=True)
-
+    d['total'] = d['total'] * 1000
     # Computing n days VWAP
     d[f'VWAP_day{forward}'] = d['total'].rolling(window=forward, min_periods=1).sum()/d['vol'].rolling(window=forward,min_periods=1).sum()
     d[f'VWAP_day{forward}'] = d[f'VWAP_day{forward}'].replace([np.inf, -np.inf], np.nan)

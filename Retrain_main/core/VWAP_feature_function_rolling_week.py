@@ -282,6 +282,7 @@ def get_features(data, columns_dict, look_back, forward):
     ''' 
 
     d = data.sort_values(by='ts').reset_index(drop=True)
+    d['total'] = d['total'] * 1000
 
     # Computing n days VWAP
     d[f'VWAP_day{forward}'] = d['total'].rolling(window=forward, min_periods=1).sum()/d['vol'].rolling(window=forward,min_periods=1).sum()
@@ -366,11 +367,41 @@ def get_features(data, columns_dict, look_back, forward):
 
     # Replacing infinity and nulls with 0
     d = d.replace([np.inf, -np.inf], 0)
-    d = d.fillna(0)
+    d = d[d.Y.notnull()]
 
     d = d.drop(columns=['VWAP_lag', 'close_lag', 'index_close_lag', 'industry_close_lag'])
 
     return d
+
+
+def separate_engineering(data, columns_dict, look_back, forward):
+
+    d = data.sort_values(by='ts')
+    if len(d[d['eliminate'] == 1]) == 0:
+        return get_features(d, columns_dict, look_back=look_back, forward=forward)
+
+    else:
+        start_date = d[d['eliminate'] == 1]['ts'].tolist()
+        start_date.sort(reverse=True)
+        df_list = []
+
+        for start in start_date:
+            d1 = d[d['ts'] < start]
+            if len(d1) != 0:
+                result = get_features(d1, columns_dict, look_back=look_back, forward=forward)
+                df_list.append(result)
+
+                d = d[d['ts'] >= start]
+            else:
+                continue
+
+        if len(d) > 0:
+            result = get_features(d, columns_dict, look_back=look_back, forward=forward)
+            df_list.append(result)
+
+        df = pd.concat(df_list, axis=0)
+
+        return df
 
 
 def read_feature_list(file_path, requirement='whole'):
@@ -392,4 +423,16 @@ def read_feature_list(file_path, requirement='whole'):
     return feature_list
 
 
-  
+def TrainTestSplit(data, SplitDate):
+
+    '''
+    Spliting data into training and testing by date
+    Input: {'data': the dataframe with features, 'SplitDate': Date splitting training and testing}
+    Output: two dataframes: training & testing
+    '''
+
+    SplitDate = datetime.strptime(SplitDate, '%Y%m%d').date()
+    train_df = data[data['ts'].dt.date < SplitDate]
+    test_df = data[data['ts'].dt.date >= SplitDate]
+
+    return train_df, test_df 

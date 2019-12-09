@@ -1,0 +1,47 @@
+2019-12-05 08:50:39 - root - INFO: - Checking if Feature Engineering is already done at 2019-12-04
+2019-12-05 08:50:39 - root - INFO: - Feature Engineering at 2019-12-04 has not done. Run the whole process.
+2019-12-05 08:50:39 - root - INFO: - Removing previous log and results 30 ago
+2019-12-05 08:50:39 - root - WARNING: - /inv_check_daily_prediction/output/log/log_20191104 Not Exists or removed
+2019-12-05 08:50:39 - root - WARNING: - /inv_check_daily_prediction/output/prediction/prediction_20191104.csv Not Exists or removed
+2019-12-05 08:50:39 - root - WARNING: - /inv_check_daily_prediction/output/feature/feature_20191104.csv Not Exists or removed
+2019-12-05 08:50:39 - root - INFO: - Query Data From ODS.Opendata at 2019-12-04
+2019-12-05 08:51:00 - root - INFO: - Filling Missing Time at 2019-12-04
+2019-12-05 08:51:07 - root - INFO: - Merging Stock Data with Index Data at 2019-12-04
+2019-12-05 08:51:16 - root - INFO: - Reading column dict at 2019-12-04
+2019-12-05 08:51:16 - root - INFO: - Feature Engineering at 2019-12-04
+2019-12-05 08:57:58 - root - INFO: - Reading feature list at 2019-12-04
+2019-12-05 08:57:59 - root - INFO: - Writing Feature to Local at 2019-12-04
+2019-12-05 08:57:59 - root - INFO: - Predicting at 2019-12-04
+2019-12-05 08:58:59 - retry.api - WARNING: - 'NoneType' object is not subscriptable, retrying in 120 seconds...
+2019-12-05 09:01:00 - retry.api - WARNING: - 'NoneType' object is not subscriptable, retrying in 120 seconds...
+2019-12-05 09:03:00 - retry.api - WARNING: - 'NoneType' object is not subscriptable, retrying in 120 seconds...
+2019-12-05 09:05:00 - retry.api - WARNING: - 'NoneType' object is not subscriptable, retrying in 120 seconds...
+2019-12-05 09:07:00 - root - ERROR: - Exception: 'NoneType' object is not subscriptable
+2019-12-05 09:07:00 - root - ERROR: - Failed when Predicting 
+Traceback (most recent call last):
+  File "/inv_check_daily_prediction/main.py", line 280, in main
+    result = Predict.prediction(this_df)
+  File "</opt/conda/lib/python3.7/site-packages/decorator.py:decorator-gen-4>", line 2, in prediction
+  File "/opt/conda/lib/python3.7/site-packages/retry/api.py", line 74, in retry_decorator
+    logger)
+  File "/opt/conda/lib/python3.7/site-packages/retry/api.py", line 33, in __retry_internal
+    return f()
+  File "/inv_check_daily_prediction/core/Prediction.py", line 30, in prediction
+    scores = prediction[0].get('scores')
+TypeError: 'NoneType' object is not subscriptable
+
+2019-12-05 10:02:34 - root - INFO: - Checking if Feature Engineering is already done at 2019-12-05
+2019-12-05 10:02:34 - root - INFO: - Feature Engineering at 2019-12-05 has not done. Run the whole process.
+2019-12-05 10:02:34 - root - INFO: - Removing previous log and results 30 ago
+2019-12-05 10:02:34 - root - WARNING: - d:\庫存健診開發\code\main\inv_check_daily_prediction\output\log\log_20191105 Not Exists or removed
+2019-12-05 10:02:34 - root - WARNING: - d:\庫存健診開發\code\main\inv_check_daily_prediction\output\prediction\prediction_20191105.csv Not Exists or removed
+2019-12-05 10:02:34 - root - WARNING: - d:\庫存健診開發\code\main\inv_check_daily_prediction\output\feature\feature_20191105.csv Not Exists or removed
+2019-12-05 10:02:34 - root - INFO: - Query Data From ODS.Opendata at 2019-12-05
+2019-12-05 10:02:34 - retry.api - WARNING: - Data Not Updated, retrying in 300 seconds...
+2019-12-05 10:04:30 - root - INFO: - Checking if Feature Engineering is already done at 2019-12-04
+2019-12-05 10:04:30 - root - INFO: - Feature Engineering of 2019-12-04 has done. Start to predict directly.
+2019-12-05 10:04:30 - root - INFO: - Predicting at 2019-12-04
+2019-12-05 10:05:18 - root - INFO: - Writing to Local at 2019-12-04
+2019-12-05 10:05:18 - root - INFO: - Writing to Database at 2019-12-04
+2019-12-05 10:05:24 - root - INFO: - Done at 2019-12-04
+2019-12-05 10:05:24 - root - INFO: - Sending message and result to telegram at 2019-12-04

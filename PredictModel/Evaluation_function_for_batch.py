@@ -27,10 +27,9 @@ def read_prediction(file_path, origin_path):
 
     prediction = pd.concat(df_list, axis=0)
     prediction['ts'] = pd.to_datetime(prediction['ts'])
-
-
-    original = pd.read_csv(origin_path, converters={'StockNo': str, 'ts': str}, usecols=['ts', 'StockNo', 'Y', 'PctRank'])
+    original = pd.read_csv(origin_path, converters={'StockNo': str, 'ts': str}, usecols=['ts', 'StockNo', 'Y', 'total'])
     original['ts'] = pd.to_datetime(original['ts'])
+
     combine = pd.merge(original, prediction[['ts', 'StockNo', 'Y_0_score', 'Y_1_score']], on=['ts', 'StockNo'], how='inner')
     combine['ts'] = pd.to_datetime(combine['ts'])
 
@@ -154,13 +153,12 @@ def plot_movement(price_data, prediction):
 
 def read_original_data(path):
     
-    data = pd.read_csv(path, converters={'ts': str, 'StockNo': str, 'StockName': str}, usecols=["ts", "StockNo", 'close', 'close_return', "VWAP_day5", 'index_close', 'foreign_ratio', 'investment_ratio', 'corporation_ratio'])
+    data = pd.read_csv(path, converters={'ts': str, 'StockNo': str, 'StockName': str}, usecols=["ts", "StockNo", 'close', 'close_return', "VWAP_day5", 'VWAP_after', 'index_close', 'foreign_ratio', 'investment_ratio', 'corporation_ratio'])
     df_list = [group[1] for group in data.groupby(data['StockNo'])]
     output_list = []
 
     for df in df_list:
         df = df.sort_values(by='ts').reset_index(drop=True)
-        df['VWAP_after'] = df['VWAP_day5'].shift(-5)
         df['future_return'] = df['VWAP_after'] - df['VWAP_day5']
         output_list.append(df)
         

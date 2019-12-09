@@ -1,4 +1,4 @@
-# 執行指令
+﻿# 執行指令
 
 $ python main.py (date)
 例: python main.py 2019-12-02
@@ -8,7 +8,7 @@ $ python main.py (date)
 # 檔案結構
  
 ## config: 
-- basic_config(基本設定檔): 含資料查詢設定、retry設定、存取資料庫設定、log/result路徑設定、預測模型路徑、舊資料保存天數、特徵工程主要參數設定
+- basic_config(基本設定檔): 含資料查詢設定、retry設定、存取資料庫設定、log/result路徑設定、最少交易天數、特徵工程主要參數設定
 - feature_config(特徵工程設定檔): 計算平均比例/momentum的天數設定、隨機指標天數設定、RSI時間區間設定、價量關係時間區間設定
 - columns_dict(欄位查詢檔): 由特徵工程的主程式(get_technical_indicators)存取，取得需重複進行相同特徵處理的欄位
 - feature_dict(特徵明細檔): 紀錄各模型所採用的特徵，在特徵工程結束後可直接取出需要的特徵
@@ -16,12 +16,12 @@ $ python main.py (date)
 
 ## core:
 - ALL_STOCK_preprocess_function: 資料存取與清理的函式檔，包含從資料庫撈取需要的資料、填補遺漏天數、結合(產業)指數資料與個股資料
-- VWAP_feature_function_rolling_week: 進行特徵處理的函式檔，包含特徵處理的主函式及子函示、存取特徵明細的函式
+- VWAP_feature_function_rolling_week: 進行特徵處理的函式檔，包含特徵處理的主函式及子函示、存取特徵明細的函式、切分訓練與測試資料及函式
 - Prediction: 進行預測的函式檔，包含將單筆資料送入預測模型並回傳結果、將結果寫入資料庫
 
 ## output:
 - log: 存放過去的log file
-- prediction: 存放過去的預測結果
+- feature: 存放經處理的訓練與測試集
 
 ## 其他:
 - main: 主程式
@@ -32,16 +32,15 @@ $ python main.py (date)
 
 - 讀取基本設定檔
 - logging設定
-- 刪除超過保留天數的log file及預測結果
+- 刪除先前的log file及預測結果
 - 從資料庫撈取資料
 - 填補遺漏時間
 - 結合(產業)指數資料與個股資料
 - 讀取欄位查詢檔
 - 進行特徵工程
+- 切分為訓練與測試集
 - 讀取特徵明細檔，並取出需要特徵
-- 逐筆資料輸入模型預測
-- 將預測資料整合後寫入存放資料夾
-- 將預測資料寫入資料庫
+- 將訓練與測試集分別寫入存放資料夾
 
 # Debug Guidance 
 
@@ -71,22 +70,18 @@ $ python main.py (date)
 
 ## 進行特徵工程(Feature Engineering): 
 - Configs not in this Directory: 特徵工程設定檔路徑有誤，確認feature_config.json是否在config資料夾下, 檔名是否正確
-- 其他錯誤: 檢視traceback並檢視VWAP_feature_function_rolling_week中的get_features函式
+- 其他錯誤: 檢視traceback並檢視VWAP_feature_function_rolling_week中的get_features或separate_engineering函式
+
+## 切分訓練與測試集(Split Training and Testing Data): 
+- 若在此段出錯，檢視traceback並檢視VWAP_feature_function_rolling_week中的TrainTestSplit函式
 
 ## 讀取特徵明細檔，並取出需要特徵(Reading feature list):
 - Feature Dict not in this Directory: 特徵明細檔路徑有誤，確認feature_dict.json是否在config資料夾下, 檔名是否正確
 - 其他錯誤: 檢視traceback並檢視VWAP_feature_function_rolling_week中的read_feature_lists函式
 
-## 逐筆資料輸入模型預測(Predicting):
-- Configs not in this Directory: 基本設定檔路徑有誤，確認basic_config.json是否在config資料夾下, 檔名是否正確
-- 未能連線: 檢查模型伺服器是否開啟、是否有其他連線問題
-- 其他錯誤: 檢視traceback並檢視Prediction中的prediction函式
-
-## 將預測資料整合後寫入存放資料夾(Writing to Local): 
+## 將訓練與測試集分別寫入存放資料夾(Writing to Local): 
 - 存取問題
 
-## 將預測資料寫入資料庫(Writing to Database):
-- Encoding Document not in this directory: 加密檔路徑有誤，確認mssqltip_bytes.bin是否在config資料夾下, 檔名是否正確
-- 其他錯誤: 檢視traceback並檢視Prediction中的write_to_db函式或檢視資料庫連線
+
 
 
