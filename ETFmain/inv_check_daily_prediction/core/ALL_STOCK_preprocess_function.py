@@ -157,7 +157,7 @@ def stock_query(start_date, end_date):
                                 AND STOCK_ID in {ETF_list}
                         ) e
                         ON d.STOCK_ID = e.STOCK_ID AND d.DATE = e.DATE
-                        LEFT_JOIN
+                        LEFT JOIN
                         (   SELECT STOCK_ID,
                                     MIN([DATE]) AS [START_DATE]
                             FROM OpenData.dbo.CMONEY_DAILY_CLOSE
