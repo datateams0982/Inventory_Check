@@ -1,8 +1,0 @@
-2019-12-03 15:18:07 - root - INFO: - Removing log and results 30 ago
-2019-12-03 15:18:07 - root - WARNING: - output\log\log_20191102 Not Exists or removed
-2019-12-03 15:18:07 - root - WARNING: - output\prediction\prediction_20191102.csv Not Exists or removed
-2019-12-03 15:18:07 - root - INFO: - Query Data From ODS.Opendata at 2019-12-02
-2019-12-03 15:18:24 - root - INFO: - Filling Missing Time at 2019-12-02
-2019-12-03 15:18:29 - root - INFO: - Merging Stock Data with Index Data at 2019-12-02
-2019-12-03 15:18:33 - root - INFO: - Reading column dict at 2019-12-02
-2019-12-03 15:18:33 - root - INFO: - Feature Engineering at 2019-12-02

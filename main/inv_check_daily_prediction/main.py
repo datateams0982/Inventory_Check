@@ -309,7 +309,6 @@ def main(end_date=date.today()):
         exception_outbound.outbound(message=f'Exception while writing prediction to Database: \n{e}; \nTime: {datetime.utcnow() + timedelta(hours=8)}')
         raise Exception('Write to Database Error')
     
-    logging.info(f'Done at {end_date}')
     logging.info(f'Sending message and result to telegram at {end_date}')
     try:
         exception_outbound.outbound(message=f'Prediction at {end_date} Success; \nTime: {datetime.utcnow() + timedelta(hours=8)}', message_type='success', file_path=result_path)
@@ -317,6 +316,8 @@ def main(end_date=date.today()):
         logging.error(f'Exception: {e}')
         logging.error(f'Failed when sending message to telegram \n{traceback.format_exc()}')
 
+    logging.info(f'Done at {end_date}')
+    
     return
 
 if __name__ == '__main__':
