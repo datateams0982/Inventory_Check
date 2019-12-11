@@ -1,4 +1,4 @@
-# 執行指令
+﻿# 執行指令
 
 $ python main.py (date)
 例: python main.py 2019-12-02
@@ -27,7 +27,7 @@ $ docker run --rm --name inv_check_daily_prediction --mount type=bind,source=[so
 
 ## core:
 - ALL_STOCK_preprocess_function: 資料存取與清理的函式檔，包含從資料庫撈取需要的資料、填補遺漏天數、結合(產業)指數資料與個股資料
-- VWAP_feature_function_rolling_week: 進行特徵處理的函式檔，包含特徵處理的主函式及子函示、存取特徵明細的函式
+- VWAP_feature_function_rolling_week: 進行特徵處理的函式檔，包含特徵處理的主函式及子函式、存取特徵明細的函式
 - Prediction: 進行預測的函式檔，包含將單筆資料送入預測模型並回傳結果、將結果寫入資料庫
 - exception_outbound: 將錯誤及程式運行訊息/預測結果傳至telegram
 
@@ -83,7 +83,7 @@ $ docker run --rm --name inv_check_daily_prediction --mount type=bind,source=[so
 - Configs not in this Directory: 基本設定檔路徑有誤，確認basic_config.json是否在config資料夾下, 檔名是否正確
 - Encoding Document not in this directory: 加密檔路徑有誤，確認mssqltip_bytes.bin是否在config資料夾下, 檔名是否正確
 - Data Not Updated: 資料庫資料尚未更新 (暫時設定會在五分鐘後重試，最多重試四次)
-- StockIIndex/Industry data length doesn't match: 回傳至python的dataframe長度與query得出之table長度不等
+- Stock/Index/Industry data length doesn't match: 回傳至python的dataframe長度與query得出之table長度不等
 - 其他錯誤: 檢視traceback並檢視ALL_STOCK_preprocess_function中的stock_query/send_query函式或資料庫連線問題
 
 ## 填補遺漏時間(Filling Missing Time): 
