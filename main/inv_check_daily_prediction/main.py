@@ -54,7 +54,7 @@ logger.addHandler(ch)
 logger.addHandler(fh)
 
 ## Main Program
-def main(end_date=date.today()):
+def main(end_date=date.today(), force_engineering=False):
 
     if type(end_date) == str:
         end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
@@ -66,7 +66,7 @@ def main(end_date=date.today()):
     logging.info(f'Checking if Feature Engineering is already done at {end_date}')
 
     feature_path = Path(__file__).parent / f"{feature_directory}{end_date.strftime('%Y%m%d')}.csv"
-    if os.path.exists(feature_path):
+    if os.path.exists(feature_path) and not force_engineering:
 
         feature_df = pd.read_csv(feature_path, converters={'ts': str, 'StockNo': str})
         if len(feature_df) >= config['check_length']:
@@ -321,9 +321,13 @@ def main(end_date=date.today()):
     return
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
+    if len(sys.argv) == 2:
         end_date = sys.argv[1]
         main(end_date)
+    elif len(sys.argv) == 3:
+        end_date = sys.argv[1]
+        force_engineering = sys.argv[2]
+        main(end_date, force_engineering)
     else:
         main()
 
